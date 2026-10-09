@@ -13,9 +13,11 @@ oc delete job instana-query-job instana-rca-job openshift-check-job infra-check-
 
 if [[ "${1:-}" == "--all" ]]; then
   echo "[cleanup] Deleting all resources..."
-  oc delete deployment sre-dashboard -n "${NAMESPACE}" --ignore-not-found
-  oc delete service sre-dashboard -n "${NAMESPACE}" --ignore-not-found
-  oc delete route sre-dashboard -n "${NAMESPACE}" --ignore-not-found
+  oc delete deployment sre-dashboard bob-chat-ui -n "${NAMESPACE}" --ignore-not-found
+  oc delete service sre-dashboard bob-chat-ui -n "${NAMESPACE}" --ignore-not-found
+  oc delete route sre-dashboard bob-chat-ui -n "${NAMESPACE}" --ignore-not-found
+  oc delete buildconfig bob-chat-ui -n "${NAMESPACE}" --ignore-not-found
+  oc delete imagestream bob-chat-ui -n "${NAMESPACE}" --ignore-not-found
   oc delete pvc sre-workspace -n "${NAMESPACE}" --ignore-not-found
   oc delete secret sre-credentials -n "${NAMESPACE}" --ignore-not-found
   oc delete configmap mock-infra-data aggregator-prompt-cm -n "${NAMESPACE}" --ignore-not-found

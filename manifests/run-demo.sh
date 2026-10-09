@@ -34,14 +34,18 @@ oc apply -f manifests/secret.yaml
 oc apply -f manifests/mock-infra-configmap.yaml
 oc apply -f manifests/aggregator-prompt-configmap.yaml
 
-# 4. Deploy dashboard (if not already running)
-echo "[3/8] Deploying dashboard..."
+# 4. Deploy dashboard and bob-chat-ui (if not already running)
+echo "[3/8] Deploying dashboard and Bob Chat UI..."
 oc apply -f manifests/dashboard-deployment.yaml
+oc apply -f manifests/bob-chat-ui.yaml
 
-# 5. Get dashboard URL
+# 5. Get service URLs
 DASHBOARD_URL=$(oc get route sre-dashboard -n "${NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null || echo "pending")
+CHAT_UI_URL=$(oc get route bob-chat-ui -n "${NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null || echo "pending — run: oc start-build bob-chat-ui -n ${NAMESPACE}")
 echo ""
-echo "  📊 Dashboard: https://${DASHBOARD_URL}"
+echo "  📊 Dashboard:  https://${DASHBOARD_URL}"
+echo "  💬 Bob Chat UI: https://${CHAT_UI_URL}"
+echo "     (Chat UI will be live after the build completes: oc start-build bob-chat-ui -n ${NAMESPACE})"
 echo ""
 
 # 6. Launch 4 parallel worker jobs
@@ -57,8 +61,14 @@ echo "[5/8] Launching RCA aggregator job..."
 oc apply -f manifests/job-aggregator.yaml
 echo "  ✅ Aggregator started (polls for findings, 10-min timeout)"
 
-# 8. Watch job status
+# 8. Trigger bob-chat-ui image build (non-blocking)
+echo "[7/8] Triggering Bob Chat UI build..."
+oc start-build bob-chat-ui -n "${NAMESPACE}" --follow=false 2>/dev/null && \
+  echo "  ✅ Build started — run: oc logs -f bc/bob-chat-ui -n ${NAMESPACE}" || \
+  echo "  ⚠️  Build trigger skipped (BuildConfig may not exist yet)"
+
+# 9. Watch job status
 echo ""
-echo "[6/8] Watching job status (Ctrl+C to exit, pipeline continues)..."
+echo "[8/8] Watching job status (Ctrl+C to exit, pipeline continues)..."
 echo ""
 watch -n 5 "oc get jobs -n ${NAMESPACE} -l app=agentic-sre && echo '' && oc get pods -n ${NAMESPACE} -l app=agentic-sre"
