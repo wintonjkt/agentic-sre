@@ -34,5 +34,4 @@ mock-data
 mock-data/**
 
 # Unused legacy tarballs
-container/bobshell-2.0.2.tgz
 services/bob-runner/bobshell-2.0.4.tgz
