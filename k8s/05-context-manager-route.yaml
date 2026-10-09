@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: context-manager
-          image: image-registry.openshift-image-registry.svc:5000/bob-assistant/context-manager:latest
+          image: image-registry.openshift-image-registry.svc:5000/sre-demo/context-manager:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
