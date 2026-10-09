@@ -1,0 +1,44 @@
+---
+# BuildConfig for the dashboard Node.js image
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sre-dashboard
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sre-dashboard
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+spec:
+  source:
+    type: Binary
+    binary: {}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: dashboard/Dockerfile
+      env:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+  output:
+    to:
+      kind: ImageStreamTag
+      name: sre-dashboard:latest
+  resources:
+    limits:
+      cpu: "500m"
+      memory: 2Gi
+    requests:
+      cpu: "200m"
+      memory: 512Mi
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3

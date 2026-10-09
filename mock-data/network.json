@@ -1,0 +1,41 @@
+{
+  "interfaces": [
+    {
+      "name": "eth0",
+      "node": "worker-0",
+      "rx_mbps": 412.3,
+      "tx_mbps": 388.7,
+      "bandwidth_util_pct": 79.8,
+      "nic_errors_per_min": 0,
+      "packet_loss_pct": 0.0
+    },
+    {
+      "name": "eth0",
+      "node": "worker-1",
+      "rx_mbps": 891.4,
+      "tx_mbps": 842.1,
+      "bandwidth_util_pct": 86.2,
+      "nic_errors_per_min": 14,
+      "packet_loss_pct": 0.3,
+      "service_hint": "worker-1 hosts MySQL and shipping — NIC errors may cause TCP retransmits affecting DB connections"
+    },
+    {
+      "name": "eth0",
+      "node": "worker-2",
+      "rx_mbps": 201.8,
+      "tx_mbps": 198.3,
+      "bandwidth_util_pct": 39.7,
+      "nic_errors_per_min": 0,
+      "packet_loss_pct": 0.0
+    },
+    {
+      "name": "bond0",
+      "node": "master-0",
+      "rx_mbps": 145.2,
+      "tx_mbps": 138.9,
+      "bandwidth_util_pct": 28.1,
+      "nic_errors_per_min": 0,
+      "packet_loss_pct": 0.0
+    }
+  ]
+}

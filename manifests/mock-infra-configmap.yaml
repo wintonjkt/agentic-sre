@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-infra-data
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+data:
+  storage.json: |
+    {
+      "volumes": [
+        {
+          "name": "mysql-data",
+          "mount_point": "/var/lib/mysql",
+          "used_pct": 94.7,
+          "iops_util_pct": 91.2,
+          "latency_ms": 78.4,
+          "read_mbps": 12.1,
+          "write_mbps": 38.6,
+          "service_hint": "MySQL — used by shipping (JPA) and ratings (PDO)"
+        },
+        {
+          "name": "mongodb-data",
+          "mount_point": "/data/db",
+          "used_pct": 71.3,
+          "iops_util_pct": 44.1,
+          "latency_ms": 18.2,
+          "read_mbps": 8.4,
+          "write_mbps": 6.1,
+          "service_hint": "MongoDB — used by catalogue and user"
+        },
+        {
+          "name": "redis-data",
+          "mount_point": "/data",
+          "used_pct": 38.2,
+          "iops_util_pct": 11.0,
+          "latency_ms": 2.1,
+          "read_mbps": 1.2,
+          "write_mbps": 0.8,
+          "service_hint": "Redis — used by cart and user"
+        }
+      ]
+    }
+  network.json: |
+    {
+      "interfaces": [
+        {
+          "name": "eth0",
+          "node": "worker-0",
+          "rx_mbps": 412.3,
+          "tx_mbps": 388.7,
+          "bandwidth_util_pct": 79.8,
+          "nic_errors_per_min": 0,
+          "packet_loss_pct": 0.0
+        },
+        {
+          "name": "eth0",
+          "node": "worker-1",
+          "rx_mbps": 891.4,
+          "tx_mbps": 842.1,
+          "bandwidth_util_pct": 86.2,
+          "nic_errors_per_min": 14,
+          "packet_loss_pct": 0.3,
+          "service_hint": "worker-1 hosts MySQL and shipping — NIC errors causing TCP retransmits"
+        }
+      ]
+    }
+  server.json: |
+    {
+      "servers": [
+        {
+          "hostname": "worker-0",
+          "role": "ocp-worker",
+          "cpu_pct": 67.2,
+          "mem_used_pct": 74.8,
+          "load_avg_15m": 3.2,
+          "cores": 4,
+          "service_hint": "Hosts: cart, catalogue, user, web, RabbitMQ"
+        },
+        {
+          "hostname": "worker-1",
+          "role": "ocp-worker",
+          "cpu_pct": 92.4,
+          "mem_used_pct": 91.7,
+          "load_avg_15m": 8.6,
+          "cores": 4,
+          "service_hint": "Hosts: MySQL, shipping (Java/Spring) — HIGH PRESSURE"
+        },
+        {
+          "hostname": "worker-2",
+          "role": "ocp-worker",
+          "cpu_pct": 44.1,
+          "mem_used_pct": 58.3,
+          "load_avg_15m": 1.9,
+          "cores": 4,
+          "service_hint": "Hosts: MongoDB, Redis, dispatch"
+        }
+      ]
+    }

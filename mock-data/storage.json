@@ -1,0 +1,44 @@
+{
+  "volumes": [
+    {
+      "name": "mysql-data",
+      "mount_point": "/var/lib/mysql",
+      "used_pct": 94.7,
+      "iops_util_pct": 91.2,
+      "latency_ms": 78.4,
+      "read_mbps": 12.1,
+      "write_mbps": 38.6,
+      "service_hint": "MySQL — used by shipping (JPA) and ratings (PDO)"
+    },
+    {
+      "name": "mongodb-data",
+      "mount_point": "/data/db",
+      "used_pct": 71.3,
+      "iops_util_pct": 44.1,
+      "latency_ms": 18.2,
+      "read_mbps": 8.4,
+      "write_mbps": 6.1,
+      "service_hint": "MongoDB — used by catalogue and user"
+    },
+    {
+      "name": "redis-data",
+      "mount_point": "/data",
+      "used_pct": 38.2,
+      "iops_util_pct": 11.0,
+      "latency_ms": 2.1,
+      "read_mbps": 1.2,
+      "write_mbps": 0.8,
+      "service_hint": "Redis — used by cart and user"
+    },
+    {
+      "name": "ocp-etcd",
+      "mount_point": "/var/lib/etcd",
+      "used_pct": 62.1,
+      "iops_util_pct": 22.3,
+      "latency_ms": 8.9,
+      "read_mbps": 2.1,
+      "write_mbps": 1.4,
+      "service_hint": "OpenShift etcd — cluster state store"
+    }
+  ]
+}

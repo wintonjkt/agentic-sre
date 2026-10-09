@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sre-dashboard
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+    component: dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sre-dashboard
+  template:
+    metadata:
+      labels:
+        app: sre-dashboard
+    spec:
+      serviceAccountName: sre-agent
+      containers:
+        - name: dashboard
+          image: image-registry.openshift-image-registry.svc:5000/sre-demo/sre-dashboard:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: WORKSPACE_DIR
+              value: /workspace
+            - name: OCP_NAMESPACE
+              value: sre-demo
+            - name: OCP_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: OCP_API_URL
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: sre-workspace
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sre-dashboard
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+    component: dashboard
+spec:
+  selector:
+    app: sre-dashboard
+  ports:
+    - port: 3000
+      targetPort: 3000
+      name: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: sre-dashboard
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+    component: dashboard
+spec:
+  to:
+    kind: Service
+    name: sre-dashboard
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

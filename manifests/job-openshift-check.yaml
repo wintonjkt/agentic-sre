@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openshift-check-job
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+    agent: openshift-check
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: agentic-sre
+        agent: openshift-check
+    spec:
+      restartPolicy: Never
+      serviceAccountName: sre-agent
+      containers:
+        - name: bob-agent
+          image: image-registry.openshift-image-registry.svc:5000/sre-demo/sre-bob:latest
+          imagePullPolicy: Always
+          env:
+            - name: OUTPUT_FILE
+              value: /workspace/ocp-findings.json
+            - name: LOG_FILE
+              value: /workspace/openshift-check.log
+            - name: CHAT_MODE
+              value: openshift-sre
+            - name: BOB_PROMPT
+              value: >-
+                You are the OpenShift SRE agent. Your task: check the health of the OpenShift cluster
+                and the Robot Shop namespace. Use oc CLI commands as defined in your mode.
+                The pod has a service account token at /var/run/secrets/kubernetes.io/serviceaccount/token.
+                Authenticate with: oc login --token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                --server=$OCP_API_URL --insecure-skip-tls-verify=true
+                Run all diagnostic commands defined in your roleDefinition:
+                node health, robot-shop pod health, unhealthy pods cluster-wide,
+                cluster operators, warning events, PVC status.
+                Write findings as valid JSON to /workspace/ocp-findings.json following
+                the ocp-findings.json schema. Include nodes, unhealthy_pods,
+                robot_shop_pods, warning_events, anomalies, and summary.
+            - name: BOBSHELL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: BOBSHELL_API_KEY
+            - name: BOB_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: BOB_GATEWAY_URL
+            - name: OCP_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: OCP_API_URL
+            - name: HOME
+              value: /bob-home
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: sre-workspace

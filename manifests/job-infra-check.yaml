@@ -1,0 +1,82 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: infra-check-job
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+    agent: infra-check
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: agentic-sre
+        agent: infra-check
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: seed-mock-infra
+          image: busybox:1.36
+          command: ["sh", "-c", "mkdir -p /workspace/mock-infra && cp /mock-data/* /workspace/mock-infra/ && echo 'Mock infra data seeded'"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: mock-data
+              mountPath: /mock-data
+      containers:
+        - name: bob-agent
+          image: image-registry.openshift-image-registry.svc:5000/sre-demo/sre-bob:latest
+          imagePullPolicy: Always
+          env:
+            - name: OUTPUT_FILE
+              value: /workspace/infra-findings.json
+            - name: LOG_FILE
+              value: /workspace/infra-check.log
+            - name: CHAT_MODE
+              value: infra-sre
+            - name: BOB_PROMPT
+              value: >-
+                You are the Infrastructure SRE agent. Your task: analyse simulated infrastructure
+                telemetry for the Robot Shop OpenShift cluster.
+                Read the three mock data files from /workspace/mock-infra/:
+                - /workspace/mock-infra/storage.json
+                - /workspace/mock-infra/network.json
+                - /workspace/mock-infra/server.json
+                Evaluate each metric against the anomaly thresholds in your roleDefinition.
+                Identify all anomalies, correlate them with Robot Shop service impacts,
+                identify the top anomaly (most likely to cause the incident detected by Instana).
+                Write findings as valid JSON to /workspace/infra-findings.json following
+                the infra-findings.json schema. Include simulated:true, all anomalies,
+                top_anomaly object with robot_shop_impact, and summary.
+            - name: BOBSHELL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: BOBSHELL_API_KEY
+            - name: BOB_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: BOB_GATEWAY_URL
+            - name: HOME
+              value: /bob-home
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: sre-workspace
+        - name: mock-data
+          configMap:
+            name: mock-infra-data
