@@ -1,0 +1,43 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: bob-runner
+  namespace: sre-demo
+  labels:
+    app: bob-chat-assistant
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: bob-runner
+  namespace: sre-demo
+  labels:
+    app: bob-chat-assistant
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/wintonjkt/agentic-sre.git
+      ref: main
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: services/bob-runner/Dockerfile
+      env:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+  output:
+    to:
+      kind: ImageStreamTag
+      name: bob-runner:latest
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: "300m"
+      memory: 512Mi

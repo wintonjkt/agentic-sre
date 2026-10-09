@@ -1,0 +1,41 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: context-manager
+  namespace: sre-demo
+  labels:
+    app: bob-chat-assistant
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: context-manager
+  namespace: sre-demo
+  labels:
+    app: bob-chat-assistant
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/wintonjkt/agentic-sre.git
+      ref: main
+    contextDir: services/context-manager
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: context-manager:latest
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: "200m"
+      memory: 512Mi
