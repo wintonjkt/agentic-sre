@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bob Chat — SRE Assistant</title>
+  <!-- marked.js for Markdown rendering in assistant messages -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <style>
+    /* ── IBM Carbon g100 dark palette ───────────────────────────────────── */
+    :root {
+      --bg:              #161616;
+      --layer-01:        #262626;
+      --layer-02:        #393939;
+      --layer-accent:    #353535;
+      --border-subtle:   #393939;
+      --border-strong:   #6f6f6f;
+      --text-primary:    #f4f4f4;
+      --text-secondary:  #c6c6c6;
+      --text-placeholder:#6f6f6f;
+      --interactive:     #0f62fe;
+      --interactive-hover:#0050e6;
+      --danger:          #da1e28;
+      --success:         #42be65;
+      --warning:         #f1c21b;
+      --user-bubble:     #353535;
+      --assistant-bubble:#262626;
+      --sidebar-width:   260px;
+      --header-height:   48px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      background: var(--bg);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+    header {
+      height: var(--header-height);
+      background: var(--layer-01);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      gap: 0.75rem;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    header .logo {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    header .title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    header .spacer { flex: 1; }
+
+    header .session-id {
+      font-size: 11px;
+      color: var(--text-placeholder);
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    /* ── Main layout ─────────────────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Saved Prompts Sidebar ───────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--layer-01);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 0.875rem 1rem 0.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar-header span {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+    }
+
+    .btn-save-new {
+      background: var(--interactive);
+      color: #fff;
+      border: none;
+      border-radius: 2px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .btn-save-new:hover { background: var(--interactive-hover); }
+
+    .prompt-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem 0;
+    }
+
+    .prompt-item {
+      display: flex;
+      align-items: center;
+      padding: 0.5rem 0.75rem 0.5rem 1rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background 0.1s;
+      gap: 0.5rem;
+    }
+    .prompt-item:hover { background: var(--layer-02); }
+
+    .prompt-item .prompt-name {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .btn-delete-prompt {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-placeholder);
+      font-size: 16px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 2px;
+      transition: color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-delete-prompt:hover { color: var(--danger); background: rgba(218,30,40,0.12); }
+
+    .prompt-empty {
+      padding: 1.5rem 1rem;
+      font-size: 12px;
+      color: var(--text-placeholder);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* ── Chat panel ──────────────────────────────────────────────────────── */
+    .chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* Mode bar */
+    .mode-bar {
+      padding: 0.5rem 1.25rem;
+      background: var(--layer-01);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+
+    .mode-bar label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .mode-bar select {
+      background: var(--layer-02);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 2px;
+      padding: 3px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* Chat history */
+    .chat-history {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 0.75rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .empty-state h3 { font-size: 18px; font-weight: 400; }
+    .empty-state p  { font-size: 13px; color: var(--text-placeholder); max-width: 360px; }
+
+    /* Message bubbles */
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 80%;
+      gap: 0.25rem;
+    }
+    .message.user     { align-self: flex-end; }
+    .message.assistant{ align-self: flex-start; }
+
+    .message-meta {
+      font-size: 11px;
+      color: var(--text-placeholder);
+      display: flex;
+      gap: 0.5rem;
+    }
+    .message.user .message-meta     { justify-content: flex-end; }
+    .message.assistant .message-meta{ justify-content: flex-start; }
+
+    .message-meta .role { font-weight: 600; color: var(--text-secondary); }
+
+    .bubble {
+      padding: 0.875rem 1rem;
+      border-radius: 4px;
+      border: 1px solid var(--border-subtle);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    .message.user .bubble {
+      background: var(--user-bubble);
+      border-color: var(--border-strong);
+    }
+    .message.assistant .bubble {
+      background: var(--assistant-bubble);
+    }
+
+    /* Markdown inside assistant bubbles */
+    .bubble h1, .bubble h2, .bubble h3 {
+      font-size: 15px; font-weight: 600; margin: 0.75rem 0 0.4rem;
+    }
+    .bubble p  { margin-bottom: 0.5rem; }
+    .bubble p:last-child { margin-bottom: 0; }
+    .bubble ul, .bubble ol { margin: 0.5rem 0 0.5rem 1.4rem; }
+    .bubble li { margin-bottom: 0.2rem; }
+    .bubble code {
+      font-family: "IBM Plex Mono", "Fira Code", monospace;
+      font-size: 12.5px;
+      background: var(--layer-02);
+      padding: 1px 5px;
+      border-radius: 2px;
+    }
+    .bubble pre {
+      background: var(--layer-02);
+      border: 1px solid var(--border-subtle);
+      border-radius: 3px;
+      padding: 0.875rem;
+      overflow-x: auto;
+      margin: 0.6rem 0;
+    }
+    .bubble pre code {
+      background: none;
+      padding: 0;
+      font-size: 12.5px;
+    }
+    .bubble blockquote {
+      border-left: 3px solid var(--border-strong);
+      margin: 0.5rem 0;
+      padding-left: 0.875rem;
+      color: var(--text-secondary);
+    }
+    .bubble table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
+    .bubble th, .bubble td {
+      border: 1px solid var(--border-subtle);
+      padding: 0.35rem 0.65rem;
+      text-align: left;
+    }
+    .bubble th { background: var(--layer-02); font-weight: 600; }
+
+    /* Loading indicator */
+    .loading-bubble {
+      align-self: flex-start;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.875rem 1rem;
+      background: var(--assistant-bubble);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .dots span {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--interactive);
+      border-radius: 50%;
+      margin: 0 2px;
+      animation: bounce 1.2s infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+      40%            { transform: translateY(-6px); opacity: 1; }
+    }
+
+    /* ── Input area ──────────────────────────────────────────────────────── */
+    .input-area {
+      padding: 1rem 1.25rem;
+      background: var(--layer-01);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+
+    #prompt-input {
+      flex: 1;
+      background: var(--layer-02);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 3px;
+      padding: 0.625rem 0.875rem;
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      min-height: 44px;
+      max-height: 180px;
+      line-height: 1.5;
+      transition: border-color 0.15s;
+    }
+    #prompt-input::placeholder { color: var(--text-placeholder); }
+    #prompt-input:focus {
+      outline: none;
+      border-color: var(--interactive);
+    }
+    #prompt-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #send-btn {
+      background: var(--interactive);
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      width: 44px; height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #send-btn:hover:not(:disabled) { background: var(--interactive-hover); }
+    #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #send-btn svg { width: 18px; height: 18px; fill: #fff; }
+
+    /* ── Save Prompt Modal ───────────────────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      background: var(--layer-01);
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      padding: 1.5rem;
+      width: 400px;
+      max-width: 90vw;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .modal h4 { font-size: 16px; font-weight: 600; }
+
+    .modal label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 0.35rem;
+    }
+
+    .modal input[type="text"] {
+      width: 100%;
+      background: var(--layer-02);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 3px;
+      padding: 0.5rem 0.75rem;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .modal input[type="text"]:focus {
+      outline: none;
+      border-color: var(--interactive);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .btn-primary {
+      background: var(--interactive);
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      padding: 8px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-primary:hover { background: var(--interactive-hover); }
+
+    .btn-ghost {
+      background: none;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 3px;
+      padding: 8px 18px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn-ghost:hover { background: var(--layer-02); }
+
+    /* ── Scrollbar styling ───────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #8d8d8d; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header>
+  <span class="logo">IBM Bob</span>
+  <span class="title">SRE Chat Assistant</span>
+  <span class="spacer"></span>
+  <span class="session-id" id="session-display"></span>
+</header>
+
+<!-- ── Layout ─────────────────────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- Saved Prompts Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span>Saved Prompts</span>
+      <button class="btn-save-new" id="open-save-modal">+ Save</button>
+    </div>
+    <div class="prompt-list" id="prompt-list">
+      <div class="prompt-empty">No saved prompts yet.<br>Send a prompt, then click&nbsp;<strong>+&nbsp;Save</strong>.</div>
+    </div>
+  </aside>
+
+  <!-- Chat Panel -->
+  <div class="chat-panel">
+
+    <!-- Mode selector bar -->
+    <div class="mode-bar">
+      <label for="mode-select">Mode:</label>
+      <select id="mode-select">
+        <option value="agent">agent</option>
+        <option value="ask">ask</option>
+        <option value="code">code</option>
+        <option value="plan">plan</option>
+        <option value="instana">instana</option>
+        <option value="openshift-sre">openshift-sre</option>
+        <option value="infra-sre">infra-sre</option>
+      </select>
+      <label for="approval-select" style="margin-left:1rem">Approval:</label>
+      <select id="approval-select">
+        <option value="default">default</option>
+        <option value="yolo">yolo</option>
+      </select>
+    </div>
+
+    <!-- Chat history -->
+    <div class="chat-history" id="chat-history">
+      <div class="empty-state" id="empty-state">
+        <h3>How can Bob help you today?</h3>
+        <p>Type a prompt below or click a saved prompt to get started. Bob Shell runs on the on-premise server.</p>
+      </div>
+    </div>
+
+    <!-- Input area -->
+    <div class="input-area">
+      <textarea
+        id="prompt-input"
+        rows="2"
+        placeholder="Ask Bob Shell… (Enter to send, Shift+Enter for newline)"
+      ></textarea>
+      <button id="send-btn" title="Send prompt">
+        <!-- Send icon (Carbon SendAlt) -->
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <path d="M27.71 4.29a1 1 0 0 0-1.05-.23l-22 8a1 1 0 0 0 0 1.87l9.6 3.84L18.09 14 14 18.09l3.84 9.6A1 1 0 0 0 18.77 28 1 1 0 0 0 19.71 27.29l8-22a1 1 0 0 0-.23-1.05z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div><!-- /.layout -->
+
+<!-- ── Save Prompt Modal ───────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="save-modal">
+  <div class="modal">
+    <h4>Save Prompt</h4>
+    <div>
+      <label for="prompt-name-input">Prompt name</label>
+      <input type="text" id="prompt-name-input" placeholder="e.g. instana-rca-query" maxlength="80" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="cancel-save">Cancel</button>
+      <button class="btn-primary" id="confirm-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Session ID ────────────────────────────────────────────────────────────
+function getSessionId() {
+  let id = sessionStorage.getItem('bob_session_id');
+  if (!id) {
+    id = 'session-' + Date.now().toString(36);
+    sessionStorage.setItem('bob_session_id', id);
+  }
+  return id;
+}
+
+const SESSION_ID = getSessionId();
+document.getElementById('session-display').textContent = SESSION_ID;
+
+// ── State ─────────────────────────────────────────────────────────────────
+let isLoading = false;
+const messages = []; // { role, content, ts }
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// ── Render chat history ───────────────────────────────────────────────────
+const chatHistory = document.getElementById('chat-history');
+const emptyState  = document.getElementById('empty-state');
+
+function renderMessages() {
+  // Remove all message elements (keep empty-state node in DOM, just hide it)
+  document.querySelectorAll('.message, .loading-bubble').forEach(el => el.remove());
+
+  if (messages.length === 0) {
+    emptyState.style.display = '';
+    return;
+  }
+  emptyState.style.display = 'none';
+
+  messages.forEach(msg => {
+    const wrap = document.createElement('div');
+    wrap.className = `message ${msg.role}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'message-meta';
+    meta.innerHTML = `<span class="role">${msg.role === 'user' ? 'You' : 'Bob'}</span><span>${formatTime(msg.ts)}</span>`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+
+    if (msg.role === 'assistant') {
+      // Render Markdown (marked.js loaded from CDN)
+      bubble.innerHTML = typeof marked !== 'undefined'
+        ? marked.parse(msg.content)
+        : escapeHtml(msg.content).replace(/\n/g, '<br>');
+    } else {
+      bubble.textContent = msg.content;
+    }
+
+    wrap.appendChild(meta);
+    wrap.appendChild(bubble);
+    chatHistory.appendChild(wrap);
+  });
+
+  scrollToBottom();
+}
+
+function showLoadingBubble() {
+  const el = document.createElement('div');
+  el.className = 'loading-bubble';
+  el.id = 'loading-bubble';
+  el.innerHTML = `
+    <div class="dots">
+      <span></span><span></span><span></span>
+    </div>
+    Bob is thinking and executing…
+  `;
+  chatHistory.appendChild(el);
+  scrollToBottom();
+}
+
+function removeLoadingBubble() {
+  const el = document.getElementById('loading-bubble');
+  if (el) el.remove();
+}
+
+function scrollToBottom() {
+  chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+// ── Send message ──────────────────────────────────────────────────────────
+const promptInput  = document.getElementById('prompt-input');
+const sendBtn      = document.getElementById('send-btn');
+const modeSelect   = document.getElementById('mode-select');
+const approvalSelect = document.getElementById('approval-select');
+
+function setLoading(val) {
+  isLoading = val;
+  promptInput.disabled = val;
+  sendBtn.disabled     = val;
+}
+
+async function sendMessage() {
+  const prompt = promptInput.value.trim();
+  if (!prompt || isLoading) return;
+
+  promptInput.value = '';
+  promptInput.style.height = '';
+
+  messages.push({ role: 'user', content: prompt, ts: Date.now() });
+  renderMessages();
+  showLoadingBubble();
+  setLoading(true);
+
+  try {
+    const res = await fetch('/api/proxy/chat', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: SESSION_ID,
+        prompt,
+        mode:         modeSelect.value,
+        approvalMode: approvalSelect.value,
+      }),
+    });
+
+    const data = await res.json();
+    removeLoadingBubble();
+
+    if (!res.ok) {
+      const errText = data.details
+        ? (typeof data.details === 'object' ? JSON.stringify(data.details, null, 2) : data.details)
+        : data.error || 'Unknown error';
+      messages.push({ role: 'assistant', content: `**Error:** ${errText}`, ts: Date.now() });
+    } else {
+      messages.push({ role: 'assistant', content: data.response || '*(no response)*', ts: Date.now() });
+    }
+  } catch (err) {
+    removeLoadingBubble();
+    messages.push({ role: 'assistant', content: `**Network error:** ${err.message}`, ts: Date.now() });
+  } finally {
+    setLoading(false);
+    renderMessages();
+    promptInput.focus();
+  }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+
+promptInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Auto-resize textarea
+promptInput.addEventListener('input', () => {
+  promptInput.style.height = 'auto';
+  promptInput.style.height = Math.min(promptInput.scrollHeight, 180) + 'px';
+});
+
+// ── Saved Prompts ─────────────────────────────────────────────────────────
+const promptListEl = document.getElementById('prompt-list');
+
+async function loadSavedPrompts() {
+  try {
+    const res  = await fetch('/api/prompts');
+    const data = await res.json();
+    renderPromptList(Array.isArray(data) ? data : []);
+  } catch (e) {
+    console.error('Failed to load prompts:', e);
+  }
+}
+
+function renderPromptList(prompts) {
+  if (prompts.length === 0) {
+    promptListEl.innerHTML = '<div class="prompt-empty">No saved prompts yet.<br>Send a prompt, then click&nbsp;<strong>+&nbsp;Save</strong>.</div>';
+    return;
+  }
+
+  promptListEl.innerHTML = '';
+  prompts.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'prompt-item';
+    item.title = p.content;
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'prompt-name';
+    nameEl.textContent = p.name;
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-delete-prompt';
+    delBtn.title = 'Delete prompt';
+    delBtn.textContent = '×';
+    delBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deletePrompt(p.name);
+    });
+
+    // Click on item inserts content into textarea
+    item.addEventListener('click', () => {
+      promptInput.value = p.content;
+      promptInput.style.height = 'auto';
+      promptInput.style.height = Math.min(promptInput.scrollHeight, 180) + 'px';
+      promptInput.focus();
+    });
+
+    item.appendChild(nameEl);
+    item.appendChild(delBtn);
+    promptListEl.appendChild(item);
+  });
+}
+
+async function deletePrompt(name) {
+  try {
+    await fetch(`/api/prompts/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    loadSavedPrompts();
+  } catch (e) {
+    console.error('Failed to delete prompt:', e);
+  }
+}
+
+// ── Save Prompt Modal ─────────────────────────────────────────────────────
+const saveModal      = document.getElementById('save-modal');
+const openSaveBtn    = document.getElementById('open-save-modal');
+const cancelSaveBtn  = document.getElementById('cancel-save');
+const confirmSaveBtn = document.getElementById('confirm-save');
+const promptNameInput = document.getElementById('prompt-name-input');
+
+openSaveBtn.addEventListener('click', () => {
+  // Pre-fill name suggestion from last user message if available
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  promptNameInput.value = lastUserMsg
+    ? lastUserMsg.content.slice(0, 40).replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\s+/g, '-').toLowerCase()
+    : '';
+  saveModal.classList.add('open');
+  promptNameInput.focus();
+});
+
+cancelSaveBtn.addEventListener('click', () => saveModal.classList.remove('open'));
+
+saveModal.addEventListener('click', e => {
+  if (e.target === saveModal) saveModal.classList.remove('open');
+});
+
+confirmSaveBtn.addEventListener('click', async () => {
+  const name    = promptNameInput.value.trim();
+  // Save the current textarea value, or the last user message content
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  const content = promptInput.value.trim() || (lastUserMsg ? lastUserMsg.content : '');
+
+  if (!name || !content) return;
+
+  try {
+    await fetch('/api/prompts', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, content }),
+    });
+    saveModal.classList.remove('open');
+    loadSavedPrompts();
+  } catch (e) {
+    console.error('Failed to save prompt:', e);
+  }
+});
+
+promptNameInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') confirmSaveBtn.click();
+  if (e.key === 'Escape') saveModal.classList.remove('open');
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadSavedPrompts();
+promptInput.focus();
+</script>
+</body>
+</html>
