@@ -16,7 +16,7 @@ set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 OCP_SERVER="https://api.itz-nknwzi.infra01-lb.syd05.techzone.ibm.com:6443"
-OCP_TOKEN="sha256~3gtM3WXfklDcxrElYBVvQKiSuzMWuco5yyfUUyRMtqw"
+OCP_TOKEN="sha256~YwP8BhZ0ztr2adlSH9WdaVrRiyM_Pz-oGCmGI9AUAVU"
 NAMESPACE="sre-demo"
 IMAGE_BASE="image-registry.openshift-image-registry.svc:5000/${NAMESPACE}"
 
