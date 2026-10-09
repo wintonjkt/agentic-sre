@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: context-manager
+  labels:
+    app: bob-chat-assistant
+    component: context-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bob-chat-assistant
+      component: context-manager
+  template:
+    metadata:
+      labels:
+        app: bob-chat-assistant
+        component: context-manager
+    spec:
+      containers:
+        - name: context-manager
+          image: image-registry.openshift-image-registry.svc:5000/bob-assistant/context-manager:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: bob-chat-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: context-manager-service
+  labels:
+    app: bob-chat-assistant
+    component: context-manager
+spec:
+  selector:
+    app: bob-chat-assistant
+    component: context-manager
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: bob-chat-route
+  labels:
+    app: bob-chat-assistant
+    component: context-manager
+spec:
+  to:
+    kind: Service
+    name: context-manager-service
+    weight: 100
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

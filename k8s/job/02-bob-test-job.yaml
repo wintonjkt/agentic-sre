@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bob-test-job
+  namespace: sre-demo
+  labels:
+    app: bob-shell-job
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: bob-shell-job
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bob-runner
+          image: image-registry.openshift-image-registry.svc:5000/sre-demo/bob-runner:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          envFrom:
+            - secretRef:
+                name: bob-inf-credentials
+          env:
+            - name: CHAT_MODE
+              value: "instana"
+            - name: BOB_PROMPT
+              value: "Say hello in one sentence. Do not use any tools."
+            - name: OUTPUT_FILE
+              value: "/workspace/output.json"
+            - name: LOG_FILE
+              value: "/workspace/agent.log"
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: "0"
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+      volumes:
+        - name: workspace
+          emptyDir: {}

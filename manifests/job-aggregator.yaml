@@ -1,0 +1,113 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rca-aggregator-job
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+    agent: rca-aggregator
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 7200
+  template:
+    metadata:
+      labels:
+        app: agentic-sre
+        agent: rca-aggregator
+    spec:
+      restartPolicy: Never
+      # Init container: wait for all 4 findings files (max 10 min timeout)
+      initContainers:
+        - name: wait-for-findings
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "[wait] Polling for all 4 findings files..."
+              TIMEOUT=600
+              ELAPSED=0
+              REQUIRED="/workspace/instana-findings.json /workspace/instana-rca.json /workspace/ocp-findings.json /workspace/infra-findings.json"
+              while true; do
+                MISSING=""
+                for f in $REQUIRED; do
+                  [ -f "$f" ] || MISSING="$MISSING $f"
+                done
+                if [ -z "$MISSING" ]; then
+                  echo "[wait] All findings files present. Proceeding."
+                  exit 0
+                fi
+                if [ $ELAPSED -ge $TIMEOUT ]; then
+                  echo "[wait] TIMEOUT after ${TIMEOUT}s. Missing: $MISSING"
+                  echo "[wait] Writing failure sentinels for missing files..."
+                  for f in $MISSING; do
+                    echo "{\"status\":\"failed\",\"completed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"error\":\"timeout — agent did not produce this file\",\"summary\":\"Agent timed out\"}" > "$f"
+                  done
+                  exit 0
+                fi
+                echo "[wait] Waiting... elapsed=${ELAPSED}s missing:${MISSING}"
+                sleep 10
+                ELAPSED=$((ELAPSED + 10))
+              done
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      containers:
+        - name: bob-aggregator
+          image: image-registry.openshift-image-registry.svc:5000/sre-demo/sre-bob:latest
+          imagePullPolicy: Always
+          env:
+            - name: OUTPUT_FILE
+              value: /workspace/rca-report.md
+            - name: LOG_FILE
+              value: /workspace/rca-aggregator.log
+            - name: CHAT_MODE
+              value: instana
+            - name: BOB_PROMPT
+              valueFrom:
+                configMapKeyRef:
+                  name: aggregator-prompt-cm
+                  key: prompt.txt
+            - name: BOBSHELL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: BOBSHELL_API_KEY
+            - name: BOB_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: BOB_GATEWAY_URL
+            - name: INSTANA_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: INSTANA_BASE_URL
+            - name: INSTANA_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: INSTANA_API_TOKEN
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: SLACK_WEBHOOK_URL
+                  optional: true
+            - name: HOME
+              value: /bob-home
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: sre-workspace

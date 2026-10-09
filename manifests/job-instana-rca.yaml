@@ -1,0 +1,83 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: instana-rca-job
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+    agent: instana-rca
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: agentic-sre
+        agent: instana-rca
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bob-agent
+          image: image-registry.openshift-image-registry.svc:5000/sre-demo/sre-bob:latest
+          imagePullPolicy: Always
+          env:
+            - name: OUTPUT_FILE
+              value: /workspace/instana-rca.json
+            - name: LOG_FILE
+              value: /workspace/instana-rca.log
+            - name: CHAT_MODE
+              value: instana
+            - name: BOB_PROMPT
+              value: >-
+                You are the Instana Deep RCA SRE agent. Your task: perform deep root cause analysis
+                using the Instana API for the Robot Shop application.
+                Use INSTANA_BASE_URL and INSTANA_API_TOKEN for authentication.
+                Step 1 - Get recent events:
+                curl -s -H "authorization: apiToken $INSTANA_API_TOKEN"
+                "$INSTANA_BASE_URL/api/events?windowSize=3600000"
+                Step 2 - For the most critical event, get call group data:
+                curl -s -X POST -H "authorization: apiToken $INSTANA_API_TOKEN"
+                -H "Content-Type: application/json"
+                "$INSTANA_BASE_URL/api/application-monitoring/analyze/call-groups"
+                -d '{"timeFrame":{"windowSize":3600000},"groupByTags":["endpoint.name","service.name"],"metrics":[{"metric":"calls","aggregation":"SUM"},{"metric":"erroneousCalls","aggregation":"SUM"},{"metric":"latency","aggregation":"P95"}]}'
+                Step 3 - Correlate findings with the Robot Shop service topology you know.
+                Write deep RCA findings as valid JSON to /workspace/instana-rca.json following
+                the instana-rca.json schema. Include affected_services, timeline,
+                root_cause_hypothesis, robot_shop_context, and summary.
+            - name: BOBSHELL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: BOBSHELL_API_KEY
+            - name: BOB_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: BOB_GATEWAY_URL
+            - name: INSTANA_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: INSTANA_BASE_URL
+            - name: INSTANA_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: sre-credentials
+                  key: INSTANA_API_TOKEN
+            - name: HOME
+              value: /bob-home
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: sre-workspace

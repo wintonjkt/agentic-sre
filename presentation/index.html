@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Agentic SRE — IBM Bob on OpenShift</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css"/>
+<style>
+:root {
+  --ibm-blue:#0f62fe; --ibm-blue-light:#4589ff; --ibm-blue-dark:#0043ce;
+  --ibm-green:#42be65; --ibm-red:#fa4d56; --ibm-yellow:#f1c21b;
+  --ibm-orange:#ff832b; --ibm-purple:#a56eff; --ibm-teal:#3ddbd9;
+  --ibm-bg:#161616; --ibm-layer1:#262626; --ibm-layer2:#393939;
+  --ibm-text:#f4f4f4; --ibm-text2:#c6c6c6; --ibm-helper:#8d8d8d; --ibm-border:#525252;
+}
+.reveal-viewport { background:var(--ibm-bg); }
+.reveal { font-family:'IBM Plex Sans','Segoe UI',sans-serif; color:var(--ibm-text); }
+.reveal h1,.reveal h2,.reveal h3,.reveal h4 {
+  font-family:'IBM Plex Sans','Segoe UI',sans-serif;
+  text-transform:none; letter-spacing:-0.5px; color:var(--ibm-text); text-shadow:none;
+}
+.reveal h1 { font-size:2.2em; font-weight:300; }
+.reveal h2 { font-size:1.6em; font-weight:600; color:var(--ibm-blue-light); }
+.reveal p,.reveal li { font-size:0.8em; line-height:1.65; color:var(--ibm-text2); }
+.reveal .slides { text-align:left; }
+.reveal .progress { background:var(--ibm-layer2); }
+.reveal .progress span { background:var(--ibm-blue); }
+.reveal .slide-number { color:var(--ibm-helper); font-size:0.5em; }
+.reveal section { padding:0!important; }
+.si { width:100%; height:100%; padding:2.5rem 3.5rem; display:flex; flex-direction:column; justify-content:center; box-sizing:border-box; }
+.si.top { justify-content:flex-start; padding-top:2.2rem; }
+.eyebrow { font-size:0.58em; font-weight:600; letter-spacing:2.5px; text-transform:uppercase; color:var(--ibm-blue); margin-bottom:0.8rem; }
+.accent { width:44px; height:3px; background:var(--ibm-blue); margin:0.5rem 0 1.2rem; }
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:1.4rem; }
+.card { background:var(--ibm-layer1); border:1px solid var(--ibm-border); padding:1rem 1.2rem; border-top:3px solid var(--ibm-blue); }
+.card.red    { border-top-color:var(--ibm-red); }
+.card.yellow { border-top-color:var(--ibm-yellow); }
+.card.green  { border-top-color:var(--ibm-green); }
+.card.orange { border-top-color:var(--ibm-orange); }
+.card.purple { border-top-color:var(--ibm-purple); }
+.card.teal   { border-top-color:var(--ibm-teal); }
+.card h4 { font-size:0.72em; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--ibm-text); margin:0 0 0.5rem; }
+.card p,.card li { font-size:0.68em; color:var(--ibm-text2); margin:0; }
+.card ul { padding-left:1.1rem; margin:0.25rem 0 0; }
+.card li { margin-bottom:0.25rem; }
+.quote-block { border-left:4px solid var(--ibm-red); padding:0.85rem 1.1rem; background:var(--ibm-layer1); font-size:0.75em; font-style:italic; color:var(--ibm-text2); margin:0 0 1rem; }
+.quote-attr { font-style:normal; font-size:0.75em; color:var(--ibm-helper); margin-top:0.4rem; }
+.step { display:flex; align-items:flex-start; gap:0.85rem; padding:0.65rem 0.85rem; background:var(--ibm-layer1); border:1px solid var(--ibm-border); border-left:3px solid var(--ibm-blue); margin-bottom:0.5rem; }
+.step-num { font-size:0.9em; font-weight:700; color:var(--ibm-blue-light); flex-shrink:0; width:1.2em; line-height:1.4; }
+.step-body { font-size:0.65em; color:var(--ibm-text2); line-height:1.55; }
+.step-body strong { color:var(--ibm-text); }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══════════════════════════════════════════════════════════════
+     SLIDE 1 — The Problem
+══════════════════════════════════════════════════════════════ -->
+<section>
+<div class="si top">
+  <div class="eyebrow">The Problem</div>
+  <h2>SRE at a Major Bank — A Broken Process</h2>
+  <div class="accent"></div>
+  <div class="two-col">
+    <div>
+      <div class="quote-block">
+        "Every P1 starts the same way. Someone pages me at 2am, I join the bridge call,
+        and the next two hours are everyone saying their component is fine.
+        By the time we find the root cause, the customer damage is done."
+        <div class="quote-attr">— Senior SRE · Core Banking Platform</div>
+      </div>
+      <div class="card red">
+        <h4>The Siloed Teams Problem</h4>
+        <ul>
+          <li>App team says app is OK</li>
+          <li>DB team says DB is OK</li>
+          <li>Platform team says OCP is OK</li>
+          <li>Infra team says hardware is OK</li>
+          <li><strong style="color:#ff8389">Nobody owns the cross-layer failure</strong></li>
+        </ul>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.75rem">
+      <div class="card yellow">
+        <h4>Bridge Call Reality</h4>
+        <ul>
+          <li>30–40 people on a call</li>
+          <li>2–4 hours to identify root cause</li>
+          <li>RCA doc written days later from memory</li>
+          <li>Same failure pattern recurs next quarter</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>The Real Challenge</h4>
+        <p style="margin-bottom:0.5rem">The failure lives at the <strong style="color:#f4f4f4">intersection</strong> of four domains — APM traces, platform events, infrastructure metrics, and application logs. No single monitoring tool sees across all layers simultaneously.</p>
+        <ul>
+          <li>Instana sees app symptoms — not the infra cause</li>
+          <li>OpenShift sees pod failures — not why MySQL is slow</li>
+          <li>Infra team sees NIC errors — not the business impact</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SLIDE 2 — The Solution
+══════════════════════════════════════════════════════════════ -->
+<section data-background-color="#040d21">
+<div class="si top" style="padding-top:2.4rem">
+  <div class="eyebrow">The Solution — IBM Bob + OpenShift</div>
+  <h2 style="color:#fff;font-weight:300">Agentic SRE — Replace the Bridge Call</h2>
+  <div class="accent"></div>
+  <div class="two-col" style="margin-top:0.2rem">
+    <div>
+      <p style="font-size:0.72em;color:#ffffffbb;line-height:1.7;margin-bottom:1rem">
+        IBM Bob runs as <strong style="color:#fff">parallel headless pods</strong> on OpenShift.
+        Each pod is a specialised AI agent assigned a single data domain.
+        They investigate simultaneously — then a final agent cross-correlates
+        all findings into one RCA report and an Ansible remediation playbook.
+      </p>
+
+      <div class="step">
+        <div class="step-num">①</div>
+        <div class="step-body"><strong>Trigger</strong> — A single POST request launches all agents simultaneously via OpenShift Jobs</div>
+      </div>
+      <div class="step">
+        <div class="step-num">②</div>
+        <div class="step-body"><strong>Parallel investigation</strong> — 4 Bob agents query Instana APM, OpenShift platform, and infrastructure telemetry concurrently, writing JSON findings to a shared PVC</div>
+      </div>
+      <div class="step">
+        <div class="step-num">③</div>
+        <div class="step-body"><strong>Aggregation</strong> — A 5th Bob agent reads all 4 findings, cross-correlates signals across domains, and produces a complete RCA + Ansible playbook</div>
+      </div>
+      <div class="step">
+        <div class="step-num">④</div>
+        <div class="step-body"><strong>Remediation</strong> — The generated playbook targets the specific root-cause service with evidence-grounded fixes — not a generic template</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.7rem">
+      <div class="card teal">
+        <h4>Bob's Role in Each Pod</h4>
+        <p style="margin-bottom:0.5rem">Bob is IBM's AI engineering assistant. Each pod is given a custom <strong style="color:#f4f4f4">mode</strong> (a role definition) and a prompt. It autonomously uses tools — <code style="color:#3ddbd9;font-size:0.9em">execute_command</code>, <code style="color:#3ddbd9;font-size:0.9em">read_file</code>, <code style="color:#3ddbd9;font-size:0.9em">write_file</code> — to investigate and write structured findings. No human in the loop.</p>
+      </div>
+      <div class="card green">
+        <h4>What Changes</h4>
+        <ul>
+          <li><strong style="color:#f4f4f4">2–4 hours → &lt;5 minutes</strong> to root cause</li>
+          <li>Cross-domain correlation no single tool provides</li>
+          <li>Structured, auditable RCA before the bridge call starts</li>
+          <li>Automated Ansible remediation — not just a diagnosis</li>
+          <li>Runs 24×7 — no on-call engineer required to start</li>
+        </ul>
+      </div>
+      <div class="card purple">
+        <h4>The Four Agent Domains</h4>
+        <ul>
+          <li><strong style="color:#f4f4f4">Instana Query</strong> — all open events &amp; incidents</li>
+          <li><strong style="color:#f4f4f4">Instana RCA</strong> — P95 latency, traces, error rates</li>
+          <li><strong style="color:#f4f4f4">OpenShift Check</strong> — pods, nodes, operators, events</li>
+          <li><strong style="color:#f4f4f4">Infra Check</strong> — CPU, disk, NIC, storage telemetry</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: true,
+    transition: 'fade',
+    transitionSpeed: 'fast',
+    controls: true,
+    progress: true,
+    center: false
+  });
+</script>
+</body>
+</html>

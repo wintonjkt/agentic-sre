@@ -1,0 +1,46 @@
+---
+# ImageStream — internal registry target for the built image
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sre-bob
+  namespace: sre-demo
+  labels:
+    app: sre-bob
+spec:
+  lookupPolicy:
+    local: true
+---
+# BuildConfig — binary build (we push local source via `oc start-build --from-dir`)
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sre-bob
+  namespace: sre-demo
+  labels:
+    app: sre-bob
+spec:
+  source:
+    type: Binary
+    binary: {}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: container/Dockerfile
+      # Allow privileged build steps (needed for oc binary install)
+      env:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+  output:
+    to:
+      kind: ImageStreamTag
+      name: sre-bob:latest
+  resources:
+    limits:
+      cpu: "2"
+      memory: 4Gi
+    requests:
+      cpu: "500m"
+      memory: 1Gi
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3

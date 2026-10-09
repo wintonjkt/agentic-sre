@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: bob-chat-assistant
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bob-chat-assistant
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: bob-chat-assistant
+        component: redis
+    spec:
+      containers:
+        - name: redis
+          image: registry.redhat.io/rhel9/redis-7:latest
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  labels:
+    app: bob-chat-assistant
+    component: redis
+spec:
+  selector:
+    app: bob-chat-assistant
+    component: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

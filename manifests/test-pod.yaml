@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sre-bob-test
+  namespace: sre-demo
+  labels:
+    app: sre-bob
+    role: test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: bob
+      image: image-registry.openshift-image-registry.svc:5000/sre-demo/sre-bob:latest
+      # Override entrypoint to keep the pod alive for exec-based testing
+      command: ["sleep", "3600"]
+      env:
+        - name: BOBSHELL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bob-api-key
+              key: BOBSHELL_API_KEY
+        - name: HOME
+          value: /root
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 2Gi

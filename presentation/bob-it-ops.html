@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bob for IT Ops</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+
+  <style>
+    /* ── Brand tokens ─────────────────────────────────────── */
+    :root {
+      --ibm-blue:     #0f62fe;
+      --ibm-blue-dk:  #0043ce;
+      --ibm-teal:     #009d9a;
+      --ibm-purple:   #8a3ffc;
+      --ibm-red:      #da1e28;
+      --ibm-yellow:   #f1c21b;
+      --ibm-gray-10:  #f4f4f4;
+      --ibm-gray-20:  #e0e0e0;
+      --ibm-gray-80:  #393939;
+      --ibm-gray-100: #161616;
+      --accent:       var(--ibm-blue);
+    }
+
+    /* ── Base overrides ───────────────────────────────────── */
+    /* No hardcoded font-size — reveal.js scales the entire 1280×720 canvas
+       to fit the browser window automatically via its minScale/maxScale.
+       All em values below are relative to that scaled base. */
+    .reveal-viewport { background: var(--ibm-gray-100); }
+
+    .reveal .slides section {
+      text-align: left;
+      padding: 0 2.2rem;
+    }
+
+    .reveal h1, .reveal h2, .reveal h3 {
+      text-transform: none;
+      letter-spacing: -.02em;
+      color: #fff;
+      margin-bottom: .45em;
+    }
+    .reveal h1 { font-size: 1.9em; }
+    .reveal h2 { font-size: 1.3em; }
+    .reveal h3 { font-size: 0.95em; color: var(--ibm-teal); }
+
+    .reveal p, .reveal li { font-size: .62em; line-height: 1.55; color: var(--ibm-gray-20); }
+    .reveal ul { padding-left: 1.1em; }
+    .reveal li { margin-bottom: .32em; }
+
+    /* ── Slide header bar ─────────────────────────────────── */
+    .slide-header {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: .3rem;
+      margin-bottom: .9rem;
+    }
+    .slide-header .icon {
+      font-size: 1.2em;
+      line-height: 1;
+    }
+    .slide-header h2 { margin: 0; font-size: 1.15em; }
+
+    /* ── Title slide ──────────────────────────────────────── */
+    .title-slide {
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      height: 100%;
+      background: linear-gradient(135deg, #161616 60%, #0a2a6e 100%);
+    }
+    .title-slide .eyebrow {
+      font-size: .55em;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: var(--ibm-teal);
+      margin-bottom: .5rem;
+    }
+    .title-slide h1 {
+      font-size: 2.2em;
+      line-height: 1.1;
+      margin: 0 0 .4rem;
+    }
+    .title-slide .subtitle {
+      font-size: .75em;
+      color: var(--ibm-gray-20);
+    }
+    .title-bar {
+      width: 4.5rem;
+      height: 3px;
+      background: var(--ibm-blue);
+      margin: 1rem 0 .7rem;
+    }
+
+    /* ── Cards grid ───────────────────────────────────────── */
+    .cards {
+      display: grid;
+      gap: .65rem;
+    }
+    .cards.cols-2 { grid-template-columns: 1fr 1fr; }
+    .cards.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+    .card {
+      background: var(--ibm-gray-80);
+      border-left: 3px solid var(--accent);
+      border-radius: 3px;
+      padding: .55rem .75rem;
+    }
+    .card.teal   { border-color: var(--ibm-teal); }
+    .card.purple { border-color: var(--ibm-purple); }
+    .card.red    { border-color: var(--ibm-red); }
+    .card.yellow { border-color: var(--ibm-yellow); }
+    .card strong { color: #fff; display: block; margin-bottom: .18rem; font-size: .62em; }
+    .card p { margin: 0; font-size: .55em; line-height: 1.45; }
+
+    /* ── Tag pills ────────────────────────────────────────── */
+    .tags { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .4rem; }
+    .tag {
+      background: #1a1a2e;
+      border: 1px solid var(--ibm-blue);
+      border-radius: 12px;
+      padding: .12rem .5rem;
+      font-size: .48em;
+      color: var(--ibm-gray-10);
+    }
+    .tag.teal   { border-color: var(--ibm-teal);   }
+    .tag.purple { border-color: var(--ibm-purple);  }
+
+    /* ── Numbered list ────────────────────────────────────── */
+    .numbered-list { counter-reset: nl; list-style: none; padding: 0; }
+    .numbered-list li {
+      counter-increment: nl;
+      display: flex;
+      gap: .55rem;
+      align-items: flex-start;
+      margin-bottom: .42rem;
+    }
+    .numbered-list li::before {
+      content: counter(nl);
+      min-width: 1.2rem;
+      height: 1.2rem;
+      background: var(--ibm-blue);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .5em;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    /* ── Code block ───────────────────────────────────────── */
+    .reveal pre {
+      font-size: .42em;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: .55rem .75rem;
+      margin: .4rem 0;
+      box-shadow: none;
+      width: 100%;
+    }
+    .reveal code { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+    /* ── Two-col layout ───────────────────────────────────── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+
+    /* ── Section label ────────────────────────────────────── */
+    .section-label {
+      font-size: .46em;
+      text-transform: uppercase;
+      letter-spacing: .18em;
+      color: var(--ibm-teal);
+      margin-bottom: .15rem;
+    }
+
+    /* ── Demo slide ───────────────────────────────────────── */
+    .demo-block {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: .55rem .75rem;
+      margin-bottom: .5rem;
+    }
+    .demo-block .label {
+      font-size: .44em;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--ibm-teal);
+      margin-bottom: .22rem;
+    }
+    .demo-block p { font-size: .52em; margin: 0 0 .18rem; }
+    .demo-block code { font-size: .52em; color: #79c0ff; }
+
+    /* ── Highlight span ───────────────────────────────────── */
+    .hi-blue   { color: var(--ibm-blue); font-weight: 600; }
+    .hi-teal   { color: var(--ibm-teal); font-weight: 600; }
+    .hi-purple { color: var(--ibm-purple); font-weight: 600; }
+
+    /* ── Fragment tweaks ──────────────────────────────────── */
+    .reveal .fragment { opacity: 0; transition: opacity .35s ease; }
+    .reveal .fragment.visible { opacity: 1; }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    .slide-footer {
+      position: fixed;
+      bottom: 10px;
+      left: 20px;
+      font-size: .38em;
+      color: #555;
+      letter-spacing: .06em;
+    }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 1 — Title
+    ══════════════════════════════════════════════════════ -->
+    <section class="title-slide">
+      <div class="eyebrow">IBM Bob · Agentic AI</div>
+      <h1>Bob for<br><span class="hi-blue">IT Operations</span></h1>
+      <div class="title-bar"></div>
+      <p class="subtitle">Transforming legacy IT Ops with Agentic Coding &amp; AI-driven automation</p>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 2 — IT Ops Persona
+    ══════════════════════════════════════════════════════ -->
+    <section>
+      <div class="slide-header">
+        <span class="icon">👤</span>
+        <h2>IT Ops Persona</h2>
+      </div>
+      <p class="section-label">Roles &amp; Responsibilities</p>
+      <div class="cards cols-2">
+        <div class="card fragment">
+          <strong>🔧 Service Availability &amp; Business Continuity</strong>
+          <p>Managing, monitoring, and optimizing core infrastructure, networks, and applications to maintain aggressive uptime SLAs and guarantee uninterrupted business workflows.</p>
+        </div>
+        <div class="card teal fragment">
+          <strong>⚡ Proactive Performance &amp; Incident Management</strong>
+          <p>Driving rapid incident response, accelerating Mean Time to Resolution (MTTR), and leveraging system insights to identify and remediate root causes before they impact end-users.</p>
+        </div>
+        <div class="card purple fragment">
+          <strong>🛡️ Compliance Readiness &amp; Data Governance</strong>
+          <p>Enforcing security protocols, executing reliable system backups, and maintaining end-to-end data tracing and log retention to align with regulatory frameworks and audit standards.</p>
+        </div>
+        <div class="card red fragment">
+          <strong>⚙️ Infrastructure Standardization &amp; Lifecycle</strong>
+          <p>Coordinating system updates, maintaining configuration consistency across diverse data center environments, and managing application life cycles to mitigate technical debt.</p>
+        </div>
+      </div>
+      <div class="card yellow fragment" style="margin-top:.8rem">
+        <strong>📚 Knowledge Institutionalization &amp; Team Enablement</strong>
+        <p>Structuring and centralizing critical operational logic, standard operating procedures, and tribal knowledge to eliminate operational silos and build a sustainable engineering culture.</p>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 3 — Pain Points
+    ══════════════════════════════════════════════════════ -->
+    <section>
+      <div class="slide-header">
+        <span class="icon">🔥</span>
+        <h2>IT Ops Pain Points</h2>
+      </div>
+      <div class="cards cols-2">
+        <div class="card fragment">
+          <strong>🔗 The Integration Paradox</strong>
+          <p>Bridging modern agile channels with rigid legacy core databases creates complex integration layers susceptible to unexpected cascading failures.</p>
+        </div>
+        <div class="card teal fragment">
+          <strong>🌫️ Fragmented Visibility &amp; Siloed Data</strong>
+          <p>Monitoring tool sprawl and lack of end-to-end tracing leave blind spots, delaying incident identification and root-cause analysis.</p>
+        </div>
+        <div class="card purple fragment">
+          <strong>🏚️ Compounding Technical Debt</strong>
+          <p>Maintenance overhead from out-of-support legacy tech absorbs engineering capacity, delaying digital innovation timelines.</p>
+        </div>
+        <div class="card red fragment">
+          <strong>🌀 Environment Divergence &amp; Drift</strong>
+          <p>Managing configuration parity between on-premise and digital environments compromises disaster recovery consistency.</p>
+        </div>
+        <div class="card yellow fragment">
+          <strong>🧠 Knowledge Stratification</strong>
+          <p>Operational logic concentrated among legacy specialists or isolated in modern teams—inhibiting unified knowledge sharing.</p>
+        </div>
+        <div class="card fragment">
+          <strong>⚖️ Compliance vs. Performance Trade-offs</strong>
+          <p>Balancing extensive log capture required by strict regulatory frameworks against storage costs and database performance constraints.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 4 — What keeps them awake
+    ══════════════════════════════════════════════════════ -->
+    <section>
+      <div class="slide-header">
+        <span class="icon">😰</span>
+        <h2>What Makes Them Unable to Sleep?</h2>
+      </div>
+      <ul class="numbered-list">
+        <li class="fragment">
+          <div>
+            <strong style="color:#fff">The Domino Effect</strong>
+            <p>No circuit breakers or automated failovers. A 5% packet loss can cascade into a complete multi-hour outage affecting millions of transactions.</p>
+          </div>
+        </li>
+        <li class="fragment">
+          <div>
+            <strong style="color:#fff">Flying Blind — Severe Observability Gaps</strong>
+            <p>No unified tracing. Engineers manually SSH into servers, pulling fragmented logs under immense pressure during outages.</p>
+          </div>
+        </li>
+        <li class="fragment">
+          <div>
+            <strong style="color:#fff">The Compliance Deficit Clock</strong>
+            <p>Logs deleted after 7 days vs. a 7-year regulatory mandate. Exposure to massive fines and unverifiable customer reimbursements.</p>
+          </div>
+        </li>
+        <li class="fragment">
+          <div>
+            <strong style="color:#fff">"Zombie Applications" &amp; Dependency Hell</strong>
+            <p>50+ apps in production, one third unmaintained with no business owners. No real-time dependency mapping — every maintenance window is a gamble.</p>
+          </div>
+        </li>
+        <li class="fragment">
+          <div>
+            <strong style="color:#fff">Single Points of Failure in Human Capital</strong>
+            <p>Critical legacy logic locked in the heads of a few senior engineers. If they're unreachable, the whole team is paralysed.</p>
+          </div>
+        </li>
+        <li class="fragment">
+          <div>
+            <strong style="color:#fff">The "WhatsApp Culture" of Incident Management</strong>
+            <p>Critical workarounds buried across unstructured, unsearchable WhatsApp groups — crisis response means frantically scrolling chat history at 2 AM.</p>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 5 — How Agentic Coding Helps
+    ══════════════════════════════════════════════════════ -->
+    <section>
+      <div class="slide-header">
+        <span class="icon">🤖</span>
+        <h2>How Agentic Coding Fills the Gap</h2>
+      </div>
+      <div class="two-col">
+        <div>
+          <div class="card fragment">
+            <strong>⚡ Increase Productivity</strong>
+            <p>Run operational commands quickly via natural-language chat — no CLI memorisation required.</p>
+          </div>
+          <div class="card teal fragment" style="margin-top:.7rem">
+            <strong>🏗️ Build In-House Apps</strong>
+            <p>Generate custom dashboards, automation scripts, and internal tools in hours, not sprints.</p>
+          </div>
+          <div class="card purple fragment" style="margin-top:.7rem">
+            <strong>🏭 Accelerate IaC</strong>
+            <p>Auto-generate Terraform, Ansible, and Helm charts that align with enterprise standards.</p>
+          </div>
+        </div>
+        <div>
+          <p class="section-label fragment">Agentic AI goes beyond IaC generation</p>
+          <ul style="font-size:.58em" class="fragment">
+            <li>🛡️ Autonomous remediation &amp; managed auto-scaling</li>
+            <li>🔍 Log extraction &amp; real-time format mapping</li>
+            <li>🗺️ Live dependency mapping &amp; change impact pre-testing</li>
+            <li>❄️ Continuous environment drift resolution</li>
+            <li>🔀 Data quality anomaly correction</li>
+            <li>⏳ Safe technical debt decomposition</li>
+            <li>💬 WhatsApp → Runbook knowledge pipelines</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 6 — Use Cases (deep dive)
+    ══════════════════════════════════════════════════════ -->
+    <section>
+      <div class="slide-header">
+        <span class="icon">💡</span>
+        <h2>Use Cases — Agentic IT Ops</h2>
+      </div>
+
+      <!-- Sub-slides for each use case -->
+      <section>
+        <h3>🛡️ Autonomous Remediation &amp; Auto-Scaling</h3>
+        <div class="cards cols-2">
+          <div class="card">
+            <strong>Dynamic Runbook Synthesis</strong>
+            <p>AI agents assess multi-layer incident alerts, synthesise a context-aware remediation script, and execute it in a sandbox before touching production.</p>
+          </div>
+          <div class="card teal">
+            <strong>Contextual Scaling</strong>
+            <p>When memory or connection pools near exhaustion, agents dynamically script and deploy traffic-shaping mechanisms or spin up isolated micro-gateways.</p>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h3>🔍 Log Extraction &amp; Real-Time Format Mapping</h3>
+        <div class="cards cols-2">
+          <div class="card purple">
+            <strong>Mainframe &amp; Legacy Log Parsing</strong>
+            <p>Agents write ad-hoc wrapper code to capture ephemeral COBOL batch outputs or CICS circular buffers, mapping archaic data into uniform JSON schemas.</p>
+          </div>
+          <div class="card red">
+            <strong>Dynamic Distributed Tracing</strong>
+            <p>Inject correlation IDs into legacy codebases and modern endpoints without manual review — closing critical end-to-end observability blind spots.</p>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h3>🗺️ Live Dependency Mapping &amp; Change Impact</h3>
+        <div class="cards cols-2">
+          <div class="card yellow">
+            <strong>Automated Source Scavenging</strong>
+            <p>Scan database configs, network routing tables, and server file systems to find undocumented payment scripts, Excel macros, and shadow IT connections.</p>
+          </div>
+          <div class="card">
+            <strong>Simulated Change Impact Analysis</strong>
+            <p>Parse discovered scripts, trace data lineage, and auto-generate an interactive live dependency catalog. Model exactly what fails before a live patch.</p>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h3>💬 WhatsApp → Runbook Knowledge Pipeline</h3>
+        <div class="cards cols-2">
+          <div class="card teal">
+            <strong>Extracting Implicit Insights</strong>
+            <p>Agents integrate with internal communication streams to continuously identify diagnostic snippets, terminal logs, and screenshots shared during outages.</p>
+          </div>
+          <div class="card purple">
+            <strong>Automating SOPs</strong>
+            <p>Reconstruct fragmented context, convert casual chat into formal markdown runbooks, map logic to code assets, and generate execute-ready procedures.</p>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 7 — Bob for ITOps
+    ══════════════════════════════════════════════════════ -->
+    <section>
+      <div class="slide-header">
+        <span class="icon">🔵</span>
+        <h2>Bob for IT Ops</h2>
+      </div>
+      <div class="two-col">
+        <div>
+          <p class="section-label">Tasks Bob Automates</p>
+          <div class="tags">
+            <span class="tag">Installation</span>
+            <span class="tag teal">Configure</span>
+            <span class="tag">Deploy to Production</span>
+            <span class="tag teal">Monitor</span>
+            <span class="tag purple">Fix &amp; Remediate</span>
+            <span class="tag">Health-Check</span>
+          </div>
+        </div>
+        <div>
+          <p class="section-label">Technology Stack</p>
+          <div class="tags">
+            <span class="tag teal">OpenShift</span>
+            <span class="tag">WebSphere / Tomcat</span>
+            <span class="tag purple">DB2</span>
+            <span class="tag purple">PostgreSQL</span>
+            <span class="tag">VMware</span>
+            <span class="tag teal">IBM Power</span>
+            <span class="tag">Dynatrace</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:1.4rem">
+        <p class="section-label">3 Ways of Using Bob for Agentic IT Ops</p>
+        <div class="cards cols-3" style="margin-top:.5rem">
+          <div class="card fragment">
+            <strong>💬 Interactive</strong>
+            <p>Bob IDE — chat-driven commands and code generation with full context awareness.</p>
+          </div>
+          <div class="card teal fragment">
+            <strong>⚙️ Non-Interactive</strong>
+            <p>Bob Shell CLI — scripted, headless automation integrated into CI/CD pipelines.</p>
+          </div>
+          <div class="card purple fragment">
+            <strong>🚀 Orchestrated</strong>
+            <p>Multiple parallel Bob shell containers on OpenShift — coordinated multi-agent SRE workflows.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 8 — Demo: Agentic RCA
+    ══════════════════════════════════════════════════════ -->
+    <section>
+      <div class="slide-header">
+        <span class="icon">🎬</span>
+        <h2>Demo: Agentic RCA</h2>
+      </div>
+      <div class="two-col">
+        <div>
+          <div class="demo-block fragment">
+            <div class="label">Step 1 — Query Instana</div>
+            <p>Show me the errors happening on the <strong style="color:#fff">Robot-Shop</strong> application on Instana</p>
+            <code>INSTANA_BASE_URL=https://ibmdevsandbox-instanaibm.instana.io/</code>
+          </div>
+
+          <div class="demo-block fragment">
+            <div class="label">Step 2 — Root Cause Analysis</div>
+            <p>Robot-shop on OpenShift is down. Find the root cause of the issue.</p>
+            <code>oc login --token=sha256~LBiMx… --server=https://api.itz-mlbbmo…:6443</code>
+          </div>
+        </div>
+        <div>
+          <div class="demo-block fragment">
+            <div class="label">Step 3 — Coordinated Agentic SRE</div>
+            <p><strong style="color:#fff">Parallel Bob agents</strong> check simultaneously:</p>
+            <ul style="font-size:.55em; margin-top:.35rem">
+              <li>📊 Instana observability data analysis</li>
+              <li>☸️ OpenShift platform health check</li>
+              <li>🖥️ Infrastructure-level health verification</li>
+            </ul>
+          </div>
+          <div class="demo-block fragment">
+            <div class="label">Step 4 — Aggregated Output</div>
+            <ul style="font-size:.55em; margin-top:.35rem">
+              <li>📋 Generate Root Cause Analysis report</li>
+              <li>📊 Impact analysis across systems</li>
+              <li>🔧 Remediation action plan</li>
+              <li>⚡ Ansible automation script to remediate</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         SLIDE 9 — Closing
+    ══════════════════════════════════════════════════════ -->
+    <section class="title-slide">
+      <div class="eyebrow">IBM Bob · Agentic AI</div>
+      <h1>Stability through<br><span class="hi-teal">Automation</span></h1>
+      <div class="title-bar" style="background:var(--ibm-teal)"></div>
+      <p class="subtitle">Stop depending on heroic human effort.<br>Let Bob turn reactive firefighting into proactive, automated operations.</p>
+      <div style="margin-top:2rem">
+        <div class="tags">
+          <span class="tag teal">Agentic RCA</span>
+          <span class="tag">Automated Runbooks</span>
+          <span class="tag teal">IaC Acceleration</span>
+          <span class="tag">Multi-Agent SRE</span>
+          <span class="tag purple">Knowledge Capture</span>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /.slides -->
+</div><!-- /.reveal -->
+
+<div class="slide-footer">IBM Bob · IT Ops</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    transition: 'slide',
+    transitionSpeed: 'fast',
+    controls: true,
+    progress: true,
+    center: false,
+    // Fixed logical canvas — reveal.js scales this to fill any window size
+    width: 1280,
+    height: 720,
+    margin: 0.04,
+    // Allow scaling down on small screens and up on large displays
+    minScale: 0.2,
+    maxScale: 2.0,
+    plugins: [ RevealNotes, RevealHighlight ]
+  });
+</script>
+</body>
+</html>

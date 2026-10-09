@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bob-chat-config
+  labels:
+    app: bob-chat-assistant
+data:
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  BOB_RUNNER_URL: "http://bob-runner-service:8081"

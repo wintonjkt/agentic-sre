@@ -1,0 +1,78 @@
+---
+# ServiceAccount used by the openshift-check Job so Bob can run oc commands
+# inside the cluster without a hardcoded external token.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sre-agent
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+---
+# View access to sre-demo namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-agent-view-sre-demo
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+subjects:
+  - kind: ServiceAccount
+    name: sre-agent
+    namespace: sre-demo
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+---
+# Cluster-scoped read access: nodes, cluster operators, storage classes
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sre-agent-cluster-reader
+  labels:
+    app: agentic-sre
+subjects:
+  - kind: ServiceAccount
+    name: sre-agent
+    namespace: sre-demo
+roleRef:
+  kind: ClusterRole
+  name: cluster-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+# Job + Pod management: allows the dashboard to trigger/reset the pipeline
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sre-job-manager
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "create", "delete", "deletecollection", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-dashboard-job-manager
+  namespace: sre-demo
+  labels:
+    app: agentic-sre
+subjects:
+  - kind: ServiceAccount
+    name: sre-agent
+    namespace: sre-demo
+roleRef:
+  kind: Role
+  name: sre-job-manager
+  apiGroup: rbac.authorization.k8s.io

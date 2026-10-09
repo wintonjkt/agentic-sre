@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>IBM Agentic SRE — Robot Shop Incident Response</title>
+
+<!-- Carbon Design System -->
+<link rel="stylesheet" href="https://1.www.s81c.com/common/carbon/web-components/tag/v2/latest/themes.css"/>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/tag/v2/latest/button.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/tag/v2/latest/tag.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/tag/v2/latest/loading.min.js"></script>
+
+<!-- Syntax highlighting -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+
+<!-- Marked for Markdown rendering -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+
+<style>
+:root {
+  --cds-background:          #161616;
+  --cds-layer-01:            #262626;
+  --cds-layer-02:            #393939;
+  --cds-border-subtle-01:    #525252;
+  --cds-border-subtle-02:    #6f6f6f;
+  --cds-text-primary:        #f4f4f4;
+  --cds-text-secondary:      #c6c6c6;
+  --cds-text-helper:         #8d8d8d;
+  --cds-interactive:         #0f62fe;
+  --cds-support-success:     #42be65;
+  --cds-support-error:       #fa4d56;
+  --cds-support-warning:     #f1c21b;
+  --cds-support-info:        #4589ff;
+}
+*    { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--cds-background); color:var(--cds-text-primary); font-family:-apple-system,'IBM Plex Sans','Segoe UI',sans-serif; font-size:14px; line-height:1.5; min-height:100vh; display:flex; flex-direction:column; }
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.header { background:var(--cds-layer-01); border-bottom:1px solid var(--cds-border-subtle-01); padding:0 2rem; height:48px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.header-left  { display:flex; align-items:center; gap:1rem; }
+.header-logo  { font-size:14px; font-weight:700; letter-spacing:-.3px; }
+.header-logo span { color:var(--cds-interactive); }
+.header-divider { width:1px; height:20px; background:var(--cds-border-subtle-01); }
+.header-subtitle { font-size:12px; color:var(--cds-text-helper); }
+.header-right { display:flex; align-items:center; gap:1rem; }
+.conn-dot { width:8px; height:8px; border-radius:50%; background:var(--cds-support-error); transition:background .3s; }
+.conn-dot.ok { background:var(--cds-support-success); box-shadow:0 0 6px #42be6566; }
+.conn-label { font-size:12px; color:var(--cds-text-helper); }
+#elapsed { font-size:12px; color:var(--cds-text-secondary); font-variant-numeric:tabular-nums; }
+
+/* ── Page routing ────────────────────────────────────────────────────── */
+.page { flex:1; display:none; }
+.page.active { display:flex; flex-direction:column; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PAGE 1 — Launcher
+═══════════════════════════════════════════════════════════════════════ */
+.launcher { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:0; }
+.launcher-left  { padding:3rem; display:flex; flex-direction:column; justify-content:center; border-right:1px solid var(--cds-border-subtle-01); }
+.launcher-right { padding:3rem; display:flex; flex-direction:column; gap:1.5rem; overflow-y:auto; }
+
+.brand-eyebrow { font-size:11px; font-weight:600; letter-spacing:2px; color:var(--cds-interactive); text-transform:uppercase; margin-bottom:1rem; }
+.brand-title   { font-size:36px; font-weight:300; line-height:1.2; margin-bottom:0.5rem; }
+.brand-title strong { font-weight:700; color:var(--cds-interactive); }
+.brand-subtitle { font-size:15px; color:var(--cds-text-secondary); margin-bottom:2rem; line-height:1.6; max-width:440px; }
+
+.trigger-btn { display:inline-flex; align-items:center; gap:0.75rem; background:var(--cds-interactive); color:#fff; border:none; padding:1rem 2rem; font-size:15px; font-weight:600; cursor:pointer; letter-spacing:.3px; position:relative; overflow:hidden; transition:background .2s; }
+.trigger-btn:hover { background:#0353e9; }
+.trigger-btn:disabled { background:#393939; color:#6f6f6f; cursor:not-allowed; }
+.trigger-btn .btn-icon { font-size:18px; }
+.trigger-btn.running { background:#262626; border:1px solid var(--cds-interactive); color:var(--cds-interactive); }
+
+.trigger-hint { font-size:12px; color:var(--cds-text-helper); margin-top:0.75rem; }
+
+.info-card { background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01); padding:1.5rem; }
+.info-card-title { font-size:12px; font-weight:600; color:var(--cds-text-helper); text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem; }
+.info-card-body { font-size:13px; color:var(--cds-text-secondary); line-height:1.7; }
+
+.service-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-top:1rem; }
+.svc-chip { background:var(--cds-layer-02); padding:0.35rem 0.75rem; font-size:12px; border-left:3px solid; display:flex; align-items:center; gap:0.4rem; }
+.svc-chip.critical { border-color:var(--cds-support-error); }
+.svc-chip.warning  { border-color:var(--cds-support-warning); }
+.svc-chip.ok       { border-color:var(--cds-support-success); }
+
+.pipeline-status-card { background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01); padding:1.25rem; }
+.ps-title { font-size:12px; font-weight:600; color:var(--cds-text-helper); text-transform:uppercase; letter-spacing:1px; margin-bottom:0.75rem; }
+.ps-row   { display:flex; align-items:center; justify-content:space-between; padding:0.35rem 0; border-bottom:1px solid #2a2a2a; font-size:12px; }
+.ps-row:last-child { border:none; }
+.ps-agent { color:var(--cds-text-secondary); }
+.ps-badge { padding:2px 8px; border-radius:2px; font-size:11px; font-weight:600; }
+.ps-badge.waiting  { background:#da1e2822; color:#ff8389; }
+.ps-badge.success  { background:#42be6522; color:var(--cds-support-success); }
+.ps-badge.failed   { background:#fa4d5622; color:#ff8389; }
+.ps-badge.running  { background:#f1c21b22; color:#f1c21b; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PAGE 2 — Live Investigation
+═══════════════════════════════════════════════════════════════════════ */
+.investigation { flex:1; padding:1.5rem 2rem; display:flex; flex-direction:column; gap:1.5rem; overflow-y:auto; }
+
+/* Section title */
+.sec-title { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--cds-text-helper); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; }
+
+/* Pipeline event log */
+.pipeline-log { background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01); padding:0.75rem 1rem; font-size:12px; font-family:'IBM Plex Mono','Courier New',monospace; color:#78a9ff; min-height:48px; max-height:80px; overflow-y:auto; }
+.pipeline-log .pl-line { padding:1px 0; }
+.pipeline-log .pl-phase { color:var(--cds-text-helper); margin-right:0.5rem; }
+.pipeline-log .pl-msg.error { color:var(--cds-support-error); }
+
+/* ── SVG DAG ─────────────────────────────────────────────────────────── */
+.dag-wrap { background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01); padding:1.5rem; display:flex; justify-content:center; }
+#pipeline-svg { width:100%; max-width:900px; height:220px; overflow:visible; }
+.dag-node rect { fill:var(--cds-layer-02); stroke:#da1e28; stroke-width:1.5; rx:4; transition:stroke .4s, stroke-width .4s, fill .4s; }
+.dag-node.waiting rect { stroke:#da1e28; stroke-width:1.5; }
+.dag-node.running rect { stroke:#f1c21b; stroke-width:2; fill:#f1c21b11; animation:node-pulse 2s infinite; }
+.dag-node.success rect { stroke:var(--cds-support-success); stroke-width:2; fill:#42be6511; }
+.dag-node.failed  rect { stroke:#da1e28; stroke-width:2; fill:#da1e2811; }
+.dag-node text  { fill:var(--cds-text-secondary); font-size:10px; font-family:inherit; }
+.dag-node .node-name { fill:var(--cds-text-primary); font-size:11px; font-weight:600; }
+.dag-edge { stroke:var(--cds-border-subtle-01); stroke-width:1.5; fill:none; stroke-dasharray:6 4; }
+.dag-edge.active { stroke:#f1c21b99; animation:dash-flow 1.2s linear infinite; }
+.dag-edge.done   { stroke:var(--cds-support-success); stroke-dasharray:none; }
+@keyframes node-pulse { 0%,100%{filter:drop-shadow(0 0 0 transparent)} 50%{filter:drop-shadow(0 0 6px #f1c21b88)} }
+@keyframes dash-flow  { to { stroke-dashoffset:-20; } }
+
+/* ── Agent cards ─────────────────────────────────────────────────────── */
+.agents-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:1rem; }
+@media(max-width:1200px){.agents-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:768px){.agents-grid{grid-template-columns:1fr 1fr;}}
+
+.agent-card { background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01); border-top:3px solid transparent; padding:1rem; display:flex; flex-direction:column; gap:0.5rem; transition:border-color .3s; }
+.agent-card.status-running { border-top-color:#f1c21b; }
+.agent-card.status-success { border-top-color:var(--cds-support-success); }
+.agent-card.status-failed  { border-top-color:var(--cds-support-error); }
+
+.card-header { display:flex; align-items:flex-start; justify-content:space-between; }
+.card-icon   { width:32px; height:32px; border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.badge { padding:2px 8px; border-radius:2px; font-size:10px; font-weight:700; letter-spacing:.5px; }
+.badge-waiting { background:#da1e2822; color:#ff8389; }
+.badge-running { background:#f1c21b22; color:#f1c21b; animation:badge-blink 2s infinite; }
+.badge-success { background:#42be6522; color:var(--cds-support-success); }
+.badge-failed  { background:#fa4d5622; color:#ff8389; }
+@keyframes badge-blink { 50%{opacity:.6} }
+
+.card-name   { font-size:12px; font-weight:600; color:var(--cds-text-primary); }
+.card-domain { font-size:10px; color:var(--cds-text-helper); }
+.card-summary { font-size:11px; color:var(--cds-text-secondary); min-height:2.4em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.card-time   { font-size:10px; color:var(--cds-text-helper); font-variant-numeric:tabular-nums; }
+
+/* Terminal log inside card */
+.card-log-toggle { background:none; border:none; color:var(--cds-text-helper); font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; gap:0.25rem; margin-top:auto; }
+.card-log-toggle:hover { color:var(--cds-text-secondary); }
+.card-log-wrap { overflow:hidden; max-height:0; transition:max-height .3s ease; }
+.card-log-wrap.open { max-height:220px; }
+.card-log { background:#0d0d0d; border:1px solid #333; padding:0.6rem; height:200px; overflow-y:auto; font-family:'IBM Plex Mono','Courier New',monospace; font-size:10px; color:#3ddbd9; line-height:1.5; }
+.card-log::-webkit-scrollbar { width:3px; }
+.card-log::-webkit-scrollbar-thumb { background:#333; }
+.log-line { white-space:pre-wrap; word-break:break-all; }
+.log-line.start { color:#42be65; font-weight:700; }
+.log-line.done  { color:#ff832b; font-weight:700; }
+.log-line.entry { color:#78a9ff; }
+
+/* ── Progress bar ────────────────────────────────────────────────────── */
+.progress-wrap { margin-top:0.5rem; }
+.progress-outer { background:var(--cds-layer-02); height:4px; border-radius:2px; overflow:hidden; }
+.progress-inner { height:100%; background:var(--cds-interactive); transition:width .5s ease; }
+.progress-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--cds-text-helper); margin-top:0.25rem; }
+
+/* ── Gantt section ───────────────────────────────────────────────────── */
+.gantt-section { }
+.gantt-toggle  { background:none; border:none; color:var(--cds-text-helper); font-size:11px; cursor:pointer; display:flex; align-items:center; gap:0.4rem; padding:0.5rem 0; }
+.gantt-toggle:hover { color:var(--cds-text-secondary); }
+.gantt-body    { display:none; background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01); padding:1rem; }
+.gantt-body.open { display:block; }
+.gantt-row  { display:grid; grid-template-columns:120px 1fr; align-items:center; gap:0.75rem; margin-bottom:0.6rem; }
+.gantt-label { font-size:11px; color:var(--cds-text-secondary); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gantt-track { background:var(--cds-layer-02); height:16px; border-radius:2px; position:relative; overflow:hidden; }
+.gantt-bar   { height:100%; border-radius:2px; min-width:4px; transition:width .5s linear; display:flex; align-items:center; padding:0 4px; font-size:9px; color:#fff; font-weight:600; white-space:nowrap; overflow:hidden; }
+.gantt-bar.running { background:var(--cds-interactive); animation:bar-pulse 2s infinite; }
+.gantt-bar.success { background:var(--cds-support-success); }
+.gantt-bar.failed  { background:var(--cds-support-error); }
+.gantt-axis { display:flex; justify-content:flex-end; margin-left:120px; padding-left:0.75rem; font-size:10px; color:var(--cds-text-helper); margin-top:0.25rem; }
+@keyframes bar-pulse { 50%{opacity:.7} }
+
+/* ── Conclusion panels ───────────────────────────────────────────────── */
+.conclusion-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+@media(max-width:1100px){.conclusion-grid{grid-template-columns:1fr;}}
+
+.panel { background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01); display:flex; flex-direction:column; min-height:500px; }
+.panel-header { padding:0.875rem 1.25rem; border-bottom:1px solid var(--cds-border-subtle-01); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.panel-title  { font-size:12px; font-weight:600; color:var(--cds-text-primary); display:flex; align-items:center; gap:0.5rem; }
+.panel-sub    { font-size:11px; color:var(--cds-text-helper); }
+.panel-body   { flex:1; overflow-y:auto; padding:1.25rem; }
+.panel-body::-webkit-scrollbar { width:4px; }
+.panel-body::-webkit-scrollbar-thumb { background:var(--cds-border-subtle-01); border-radius:2px; }
+
+.placeholder  { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:0.75rem; color:var(--cds-text-helper); }
+.ph-icon { font-size:32px; opacity:.4; }
+.ph-text { font-size:13px; text-align:center; }
+
+/* RCA content styling — shared between Page 2 panel and detail drawer */
+#rca-content, #rca-md-content { font-size:13px; line-height:1.7; }
+#rca-content h1, #rca-md-content h1 { font-size:18px; font-weight:600; margin-bottom:1rem; color:var(--cds-text-primary); }
+#rca-content h2, #rca-md-content h2 { font-size:14px; font-weight:600; margin:1.25rem 0 .5rem; color:var(--cds-text-primary); border-bottom:1px solid var(--cds-border-subtle-01); padding-bottom:.25rem; }
+#rca-content h3, #rca-md-content h3 { font-size:13px; font-weight:600; margin:.75rem 0 .25rem; color:var(--cds-text-secondary); }
+#rca-content p,  #rca-md-content p  { margin-bottom:.75rem; color:var(--cds-text-secondary); }
+#rca-content ul, #rca-content ol, #rca-md-content ul, #rca-md-content ol { padding-left:1.5rem; margin-bottom:.75rem; color:var(--cds-text-secondary); }
+#rca-content li, #rca-md-content li { margin-bottom:.25rem; }
+#rca-content code, #rca-md-content code { background:#333; padding:1px 5px; border-radius:2px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#78a9ff; }
+#rca-content pre, #rca-md-content pre { background:#1e1e1e; border:1px solid var(--cds-border-subtle-01); border-radius:2px; padding:.75rem; overflow-x:auto; margin-bottom:.75rem; }
+#rca-content pre code, #rca-md-content pre code { background:none; padding:0; color:#e8e8e8; font-size:12px; }
+#rca-content table, #rca-md-content table { width:100%; border-collapse:collapse; margin-bottom:.75rem; font-size:12px; }
+#rca-content th, #rca-md-content th { background:var(--cds-layer-02); padding:.4rem .75rem; text-align:left; color:var(--cds-text-primary); border:1px solid var(--cds-border-subtle-01); font-weight:600; }
+#rca-content td, #rca-md-content td { padding:.4rem .75rem; border:1px solid var(--cds-border-subtle-01); color:var(--cds-text-secondary); }
+#rca-content blockquote, #rca-md-content blockquote { border-left:3px solid var(--cds-interactive); padding-left:.75rem; color:var(--cds-text-helper); font-style:italic; margin-bottom:.75rem; }
+
+/* Copy button */
+.copy-btn { background:var(--cds-layer-02); border:1px solid var(--cds-border-subtle-01); color:var(--cds-text-secondary); padding:4px 12px; font-size:11px; cursor:pointer; transition:background .2s; }
+.copy-btn:hover { background:var(--cds-border-subtle-01); }
+.copy-btn.copied { color:var(--cds-support-success); }
+
+/* Ansible code wrap */
+.ansible-wrap { flex:1; overflow:auto; background:#1d1f21; }
+.ansible-wrap pre { margin:0; border-radius:0; height:100%; font-size:12px; }
+.ansible-wrap code { font-family:'IBM Plex Mono','Courier New',monospace; }
+
+/* ── Back button ─────────────────────────────────────────────────────── */
+.back-btn { background:none; border:1px solid var(--cds-border-subtle-01); color:var(--cds-text-secondary); padding:6px 14px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:0.4rem; }
+.back-btn:hover { background:var(--cds-layer-02); }
+
+/* ── View-detail button on card ──────────────────────────────────────── */
+.card-detail-btn { background:none; border:none; color:var(--cds-interactive); font-size:10px; cursor:pointer; padding:0; text-align:left; display:inline-flex; align-items:center; gap:0.2rem; margin-top:2px; }
+.card-detail-btn:hover { text-decoration:underline; }
+.card-detail-btn:disabled { color:var(--cds-text-helper); cursor:not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PAGE 3 — Agent Detail Drawer
+═══════════════════════════════════════════════════════════════════════ */
+/* Full-page overlay that slides in from the right */
+#detail-overlay {
+  position:fixed; inset:0; z-index:500;
+  display:none; align-items:stretch; justify-content:flex-end;
+}
+#detail-overlay.open { display:flex; }
+#detail-backdrop {
+  flex:1; background:rgba(0,0,0,.55); cursor:pointer;
+}
+#detail-drawer {
+  width:min(820px,96vw); background:var(--cds-background);
+  border-left:1px solid var(--cds-border-subtle-01);
+  display:flex; flex-direction:column;
+  animation:drawer-in .22s ease;
+  overflow:hidden;
+}
+@keyframes drawer-in { from{transform:translateX(100%)} to{transform:translateX(0)} }
+
+.drawer-header {
+  background:var(--cds-layer-01); border-bottom:1px solid var(--cds-border-subtle-01);
+  padding:.875rem 1.5rem; display:flex; align-items:center; gap:1rem; flex-shrink:0;
+}
+.drawer-agent-icon { width:36px; height:36px; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.drawer-title-wrap { flex:1; min-width:0; }
+.drawer-title { font-size:16px; font-weight:600; color:var(--cds-text-primary); }
+.drawer-subtitle { font-size:12px; color:var(--cds-text-helper); margin-top:1px; }
+.drawer-close { background:none; border:none; color:var(--cds-text-helper); font-size:20px; cursor:pointer; line-height:1; padding:4px 6px; flex-shrink:0; }
+.drawer-close:hover { color:var(--cds-text-primary); }
+
+.drawer-body { flex:1; overflow-y:auto; padding:1.5rem; }
+.drawer-body::-webkit-scrollbar { width:6px; }
+.drawer-body::-webkit-scrollbar-thumb { background:var(--cds-border-subtle-01); border-radius:3px; }
+
+/* Section within detail */
+.det-section { margin-bottom:1.75rem; }
+.det-section-title {
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px;
+  color:var(--cds-text-helper); margin-bottom:.75rem;
+  padding-bottom:.4rem; border-bottom:1px solid var(--cds-border-subtle-01);
+  display:flex; align-items:center; gap:.5rem;
+}
+.det-section-title .det-icon { font-size:13px; }
+
+/* Summary hero box */
+.det-hero {
+  background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01);
+  border-left:4px solid var(--agent-color,#0f62fe);
+  padding:1rem 1.25rem; margin-bottom:1.5rem;
+  font-size:14px; color:var(--cds-text-secondary); line-height:1.7;
+}
+.det-hero strong { color:var(--cds-text-primary); }
+
+/* Key-value grid */
+.det-kv { display:grid; grid-template-columns:1fr 1fr; gap:.5rem 1.5rem; }
+.det-kv-item { display:flex; flex-direction:column; gap:2px; }
+.det-kv-label { font-size:10px; font-weight:600; color:var(--cds-text-helper); text-transform:uppercase; letter-spacing:.8px; }
+.det-kv-value { font-size:13px; color:var(--cds-text-primary); font-family:'IBM Plex Mono',monospace; }
+.det-kv-value.ok      { color:var(--cds-support-success); }
+.det-kv-value.warn    { color:var(--cds-support-warning); }
+.det-kv-value.crit    { color:var(--cds-support-error); }
+.det-kv-value.neutral { color:var(--cds-text-secondary); font-family:inherit; }
+
+/* Severity chip */
+.sev-chip { display:inline-flex; align-items:center; gap:.3rem; padding:2px 8px; border-radius:2px; font-size:11px; font-weight:700; }
+.sev-chip.critical { background:#fa4d5622; color:#ff8389; }
+.sev-chip.warning  { background:#f1c21b22; color:#f1c21b; }
+.sev-chip.ok       { background:#42be6522; color:#42be65; }
+.sev-chip.info     { background:#0f62fe22; color:#4589ff; }
+
+/* Incidents / events list */
+.det-list { display:flex; flex-direction:column; gap:.6rem; }
+.det-list-item {
+  background:var(--cds-layer-01); border:1px solid var(--cds-border-subtle-01);
+  padding:.75rem 1rem; display:flex; gap:1rem; align-items:flex-start;
+}
+.det-list-left { flex-shrink:0; width:6px; align-self:stretch; border-radius:3px; }
+.det-list-left.critical { background:var(--cds-support-error); }
+.det-list-left.warning  { background:var(--cds-support-warning); }
+.det-list-left.ok       { background:var(--cds-support-success); }
+.det-list-content { flex:1; min-width:0; }
+.det-list-title { font-size:13px; font-weight:600; color:var(--cds-text-primary); margin-bottom:3px; }
+.det-list-meta  { font-size:11px; color:var(--cds-text-helper); display:flex; flex-wrap:wrap; gap:.5rem; }
+.det-list-desc  { font-size:12px; color:var(--cds-text-secondary); margin-top:.25rem; line-height:1.5; }
+
+/* Node table */
+.det-table { width:100%; border-collapse:collapse; font-size:12px; }
+.det-table th { background:var(--cds-layer-02); padding:.4rem .75rem; text-align:left; color:var(--cds-text-helper); font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--cds-border-subtle-01); }
+.det-table td { padding:.45rem .75rem; border-bottom:1px solid #2a2a2a; color:var(--cds-text-secondary); }
+.det-table tr:last-child td { border-bottom:none; }
+.det-table tr:hover td { background:var(--cds-layer-01); }
+.det-table .mono { font-family:'IBM Plex Mono',monospace; font-size:11px; }
+.det-table .ok   { color:var(--cds-support-success); }
+.det-table .warn { color:var(--cds-support-warning); }
+.det-table .crit { color:var(--cds-support-error); }
+
+/* Metric bar */
+.metric-row { display:flex; align-items:center; gap:.75rem; margin-bottom:.5rem; }
+.metric-label { font-size:11px; color:var(--cds-text-secondary); width:140px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.metric-track { flex:1; background:var(--cds-layer-02); height:12px; border-radius:2px; overflow:hidden; }
+.metric-fill  { height:100%; border-radius:2px; transition:width .6s ease; }
+.metric-fill.ok   { background:var(--cds-support-success); }
+.metric-fill.warn { background:var(--cds-support-warning); }
+.metric-fill.crit { background:var(--cds-support-error); }
+.metric-val  { font-size:11px; color:var(--cds-text-primary); font-variant-numeric:tabular-nums; width:48px; text-align:right; font-family:'IBM Plex Mono',monospace; }
+
+/* Raw JSON toggle */
+.raw-toggle { background:none; border:1px solid var(--cds-border-subtle-01); color:var(--cds-text-helper); font-size:11px; cursor:pointer; padding:4px 10px; margin-top:.5rem; }
+.raw-toggle:hover { background:var(--cds-layer-02); color:var(--cds-text-secondary); }
+.raw-json-wrap { display:none; margin-top:.75rem; max-height:350px; overflow:auto; background:#1a1a1a; border:1px solid var(--cds-border-subtle-01); padding:.75rem; border-radius:2px; }
+.raw-json-wrap.open { display:block; }
+.raw-json-wrap pre { font-family:'IBM Plex Mono',monospace; font-size:11px; color:#abb2bf; white-space:pre-wrap; word-break:break-all; }
+
+/* ── Toast ───────────────────────────────────────────────────────────── */
+#toast-wrap { position:fixed; bottom:1.5rem; right:1.5rem; display:flex; flex-direction:column; gap:.5rem; z-index:9999; }
+.toast { background:var(--cds-layer-02); border:1px solid var(--cds-border-subtle-01); border-left:4px solid var(--cds-interactive); padding:.75rem 1.25rem; font-size:13px; min-width:280px; max-width:400px; animation:slide-in .2s ease; }
+.toast.success { border-left-color:var(--cds-support-success); }
+.toast.error   { border-left-color:var(--cds-support-error); }
+@keyframes slide-in { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+.footer { background:var(--cds-layer-01); border-top:1px solid var(--cds-border-subtle-01); padding:.75rem 2rem; display:flex; justify-content:space-between; font-size:11px; color:var(--cds-text-helper); flex-shrink:0; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:var(--cds-background); }
+::-webkit-scrollbar-thumb { background:var(--cds-border-subtle-02); border-radius:3px; }
+
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="header-left">
+    <div class="header-logo"><span>IBM</span> Agentic SRE</div>
+    <div class="header-divider" style="width:1px;height:20px;background:var(--cds-border-subtle-01)"></div>
+    <div class="header-subtitle">Robot Shop · OpenShift Incident Response</div>
+  </div>
+  <div class="header-right">
+    <span id="elapsed">–</span>
+    <div class="conn-dot" id="conn-dot"></div>
+    <span class="conn-label" id="conn-label">Connecting…</span>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     PAGE 1 — Investigation Launcher
+══════════════════════════════════════════════════════════════════════ -->
+<div class="page active" id="page-launcher">
+  <div class="launcher">
+    <!-- Left: Hero -->
+    <div class="launcher-left">
+      <div class="brand-eyebrow">IBM Instana + OpenShift</div>
+      <h1 class="brand-title">Agentic SRE<br><strong>Root Cause Analysis</strong></h1>
+      <p class="brand-subtitle">
+        Bob CLI runs as 5 parallel pods — querying Instana observability data, checking OpenShift platform health,
+        analysing infrastructure telemetry, and synthesising a complete RCA report with an Ansible remediation playbook.
+        All without a single bridge call.
+      </p>
+
+      <button class="trigger-btn" id="trigger-btn" onclick="startInvestigation()">
+        <span class="btn-icon">▶</span>
+        <span id="trigger-label">Start Investigation</span>
+      </button>
+      <div class="trigger-hint" id="trigger-hint">Launches 5 Bob CLI pods in parallel on OpenShift</div>
+    </div>
+
+    <!-- Right: Context + Status -->
+    <div class="launcher-right">
+      <div class="info-card">
+        <div class="info-card-title">🔴 Active Incident — Robot Shop</div>
+        <div class="info-card-body">
+          Critical multi-service degradation detected by Instana. The <code style="background:#333;padding:1px 5px;font-family:monospace;font-size:12px;color:#78a9ff">shipping</code> service has 0/1 available replicas,
+          payment error rate is at 48.3%, and MySQL I/O saturation is at 94.7% capacity on <code style="background:#333;padding:1px 5px;font-family:monospace;font-size:12px;color:#78a9ff">worker-1</code>.
+          <div class="service-grid" style="margin-top:1rem">
+            <div class="svc-chip critical">🔴 shipping — OOMKilled</div>
+            <div class="svc-chip critical">🔴 payment — 48.3% errors</div>
+            <div class="svc-chip critical">🔴 catalogue — 0/1 replicas</div>
+            <div class="svc-chip warning">🟡 mysql — I/O saturated</div>
+            <div class="svc-chip warning">🟡 ratings — slow queries</div>
+            <div class="svc-chip warning">🟡 cart — Redis latency</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card-title">🤖 Investigation Pipeline</div>
+        <div class="info-card-body">
+          <div style="display:flex;flex-direction:column;gap:0.6rem">
+            <div style="display:flex;gap:0.75rem;align-items:flex-start">
+              <span style="color:#0f62fe;font-weight:700;flex-shrink:0">①</span>
+              <span><strong style="color:var(--cds-text-primary)">Instana Query</strong> — fetches all open events and incidents via REST API</span>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:flex-start">
+              <span style="color:#0f62fe;font-weight:700;flex-shrink:0">②</span>
+              <span><strong style="color:var(--cds-text-primary)">Instana Deep RCA</strong> — analyses call groups, P95 latency, error rates</span>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:flex-start">
+              <span style="color:#ee5396;font-weight:700;flex-shrink:0">③</span>
+              <span><strong style="color:var(--cds-text-primary)">OpenShift Check</strong> — inspects nodes, pods, operators, events via <code style="background:#333;padding:0 4px;font-size:11px;color:#78a9ff">oc</code></span>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:flex-start">
+              <span style="color:#42be65;font-weight:700;flex-shrink:0">④</span>
+              <span><strong style="color:var(--cds-text-primary)">Infra Check</strong> — evaluates simulated storage, network, and server telemetry</span>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:flex-start">
+              <span style="color:#ff832b;font-weight:700;flex-shrink:0">⑤</span>
+              <span><strong style="color:var(--cds-text-primary)">RCA Aggregator</strong> — synthesises all findings into report + Ansible playbook</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipeline-status-card" id="ps-card">
+        <div class="ps-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Previous Run Status</span>
+          <span id="ps-refresh-indicator" style="font-size:10px;color:var(--cds-text-helper);font-variant-numeric:tabular-nums"></span>
+        </div>
+        <div id="ps-rows">
+          <div style="font-size:12px;color:var(--cds-text-helper)">Loading…</div>
+        </div>
+        <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+          <button class="copy-btn" id="reset-btn" onclick="resetWorkspace()" style="font-size:11px;padding:4px 10px">✕ Reset Workspace</button>
+          <button class="copy-btn" id="download-btn" onclick="downloadReport()" style="font-size:11px;padding:4px 10px">⬇ Download Report</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     PAGE 2 — Live Investigation
+══════════════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-investigation">
+  <div class="investigation">
+
+    <!-- Top bar: back btn + refresh btn + pipeline event log -->
+    <div style="display:flex;align-items:flex-start;gap:1rem">
+      <button class="back-btn" onclick="showPage(1)">← Back</button>
+      <button class="back-btn" id="refresh-btn" onclick="manualRefresh()" style="border-color:var(--cds-interactive);color:var(--cds-interactive)" title="Refresh all agent statuses from the server">
+        <span id="refresh-icon">↻</span> Refresh
+      </button>
+      <div style="flex:1">
+        <div class="sec-title">Pipeline Activity</div>
+        <div class="pipeline-log" id="pipeline-log">
+          <div class="pl-line" style="color:var(--cds-text-helper)">Waiting for pipeline events…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Animated SVG DAG -->
+    <div>
+      <div class="sec-title">▸ Investigation Flow</div>
+      <div class="dag-wrap">
+        <svg id="pipeline-svg" viewBox="0 0 880 210" xmlns="http://www.w3.org/2000/svg">
+          <!-- Parallel agent nodes (row 1) -->
+          <!-- instana-query: x=30 -->
+          <g class="dag-node" id="dag-instana-query" style="cursor:pointer" onclick="dagNodeClick('instana-query')">
+            <rect x="10" y="10" width="150" height="70" rx="4"/>
+            <text x="85" y="34" text-anchor="middle" class="node-name">Instana Query</text>
+            <text x="85" y="50" text-anchor="middle">Observability</text>
+            <text x="85" y="66" text-anchor="middle" id="dag-badge-instana-query">NOT STARTED</text>
+          </g>
+          <!-- instana-rca: x=200 -->
+          <g class="dag-node" id="dag-instana-rca" style="cursor:pointer" onclick="dagNodeClick('instana-rca')">
+            <rect x="185" y="10" width="150" height="70" rx="4"/>
+            <text x="260" y="34" text-anchor="middle" class="node-name">Instana RCA</text>
+            <text x="260" y="50" text-anchor="middle">Analysis</text>
+            <text x="260" y="66" text-anchor="middle" id="dag-badge-instana-rca">NOT STARTED</text>
+          </g>
+          <!-- openshift-check: x=370 -->
+          <g class="dag-node" id="dag-openshift-check" style="cursor:pointer" onclick="dagNodeClick('openshift-check')">
+            <rect x="360" y="10" width="160" height="70" rx="4"/>
+            <text x="440" y="34" text-anchor="middle" class="node-name">OpenShift Check</text>
+            <text x="440" y="50" text-anchor="middle">Platform</text>
+            <text x="440" y="66" text-anchor="middle" id="dag-badge-openshift-check">NOT STARTED</text>
+          </g>
+          <!-- infra-check: x=545 -->
+          <g class="dag-node" id="dag-infra-check" style="cursor:pointer" onclick="dagNodeClick('infra-check')">
+            <rect x="540" y="10" width="150" height="70" rx="4"/>
+            <text x="615" y="34" text-anchor="middle" class="node-name">Infra Check</text>
+            <text x="615" y="50" text-anchor="middle">Infrastructure</text>
+            <text x="615" y="66" text-anchor="middle" id="dag-badge-infra-check">NOT STARTED</text>
+          </g>
+
+          <!-- Aggregator node (row 2, centred) -->
+          <g class="dag-node" id="dag-rca-aggregator" style="cursor:pointer" onclick="dagNodeClick('rca-aggregator')">
+            <rect x="315" y="140" width="170" height="60" rx="4"/>
+            <text x="400" y="163" text-anchor="middle" class="node-name">RCA Aggregator</text>
+            <text x="400" y="179" text-anchor="middle">Synthesis</text>
+            <text x="400" y="194" text-anchor="middle" id="dag-badge-rca-aggregator">NOT STARTED</text>
+          </g>
+
+          <!-- Edges: parallel agents → aggregator -->
+          <path id="edge-instana-query"   class="dag-edge" d="M 85 80 C 85 115 400 115 400 140"/>
+          <path id="edge-instana-rca"     class="dag-edge" d="M 260 80 C 260 115 400 115 400 140"/>
+          <path id="edge-openshift-check" class="dag-edge" d="M 440 80 C 440 115 400 115 400 140"/>
+          <path id="edge-infra-check"     class="dag-edge" d="M 615 80 C 615 115 400 115 400 140"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Agent cards with log terminals -->
+    <div>
+      <div class="sec-title">▸ Parallel SRE Agents</div>
+      <div class="agents-grid" id="agents-grid"></div>
+      <div class="progress-wrap">
+        <div class="progress-outer"><div class="progress-inner" id="overall-progress" style="width:0%"></div></div>
+        <div class="progress-labels">
+          <span id="progress-left">Waiting for agents…</span>
+          <span id="progress-right">0 / 5</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gantt timeline (collapsible) -->
+    <div class="gantt-section">
+      <button class="gantt-toggle" onclick="toggleGantt()" id="gantt-toggle">▶ Agent Timeline (Gantt)</button>
+      <div class="gantt-body" id="gantt-body">
+        <div id="gantt-rows"></div>
+        <div class="gantt-axis" id="gantt-axis">0s</div>
+      </div>
+    </div>
+
+    <!-- Conclusion panels -->
+    <div>
+      <div class="sec-title">▸ Final Conclusion</div>
+      <div class="conclusion-grid">
+        <!-- RCA Report -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">
+              <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M26 6H6a2 2 0 00-2 2v16a2 2 0 002 2h20a2 2 0 002-2V8a2 2 0 00-2-2zM6 24V8h20v16z"/><path d="M10 13h12v2H10zm0 4h8v2h-8z"/></svg>
+              RCA Report
+            </span>
+            <span class="panel-sub" id="rca-status">Waiting for aggregator…</span>
+          </div>
+          <div class="panel-body" id="rca-body">
+            <div class="placeholder" id="rca-placeholder">
+              <div class="ph-icon">📋</div>
+              <div class="ph-text">Report will appear when the aggregator completes</div>
+            </div>
+            <div id="rca-content" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- Ansible Playbook -->
+        <div class="panel" style="display:flex;flex-direction:column">
+          <div class="panel-header">
+            <span class="panel-title">
+              <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2C8.268 2 2 8.268 2 16s6.268 14 14 14 14-6.268 14-14S23.732 2 16 2zm0 2c6.627 0 12 5.373 12 12S22.627 28 16 28 4 22.627 4 16 9.373 4 16 4zm-1 4v9.586l-3.293-3.293-1.414 1.414L16 21.414l5.707-5.707-1.414-1.414L17 17.586V8z"/></svg>
+              Ansible Remediation Playbook
+            </span>
+            <button class="copy-btn" id="copy-btn" onclick="copyPlaybook()" style="display:none">⎘ Copy</button>
+          </div>
+          <div class="ansible-wrap" id="ansible-wrap">
+            <div class="placeholder" id="ansible-placeholder" style="background:#1d1f21">
+              <div class="ph-icon">🔧</div>
+              <div class="ph-text">Playbook will appear when the aggregator completes</div>
+            </div>
+            <pre id="ansible-pre" style="display:none;margin:0"><code class="language-yaml" id="ansible-code"></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.investigation -->
+</div><!-- /#page-investigation -->
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     DETAIL DRAWER — slides in over any page
+══════════════════════════════════════════════════════════════════════ -->
+<div id="detail-overlay">
+  <div id="detail-backdrop" onclick="closeDetail()"></div>
+  <div id="detail-drawer">
+    <div class="drawer-header" id="drawer-header">
+      <div class="drawer-agent-icon" id="drawer-icon"></div>
+      <div class="drawer-title-wrap">
+        <div class="drawer-title" id="drawer-title">Agent Findings</div>
+        <div class="drawer-subtitle" id="drawer-subtitle"></div>
+      </div>
+      <button class="drawer-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="drawer-body" id="drawer-body">
+      <div class="placeholder"><div class="ph-icon">⏳</div><div class="ph-text">Loading findings…</div></div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>IBM Agentic SRE Demo · Robot Shop on OpenShift · Bob CLI v2.0.2</span>
+  <span id="footer-ts">–</span>
+</footer>
+
+<div id="toast-wrap"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  Constants
+// ══════════════════════════════════════════════════════════════════════
+const AGENTS = [
+  { id: 'instana-query',   name: 'Instana Query',    domain: 'Observability',  icon: '🔍', color: '#0f62fe' },
+  { id: 'instana-rca',     name: 'Instana RCA',       domain: 'Analysis',       icon: '📊', color: '#0f62fe' },
+  { id: 'openshift-check', name: 'OpenShift Health',  domain: 'Platform',       icon: '☁️', color: '#ee5396' },
+  { id: 'infra-check',     name: 'Infra Check',        domain: 'Infrastructure', icon: '🖥', color: '#42be65' },
+  { id: 'rca-aggregator',  name: 'RCA Aggregator',     domain: 'Synthesis',      icon: '⚡', color: '#ff832b' },
+];
+
+// ══════════════════════════════════════════════════════════════════════
+//  State
+// ══════════════════════════════════════════════════════════════════════
+const agentState  = {};   // agentId → { status, summary, completed_at }
+const agentLogs   = {};   // agentId → string[]
+const ganttStart  = {};   // agentId → ms timestamp
+const ganttEnd    = {};   // agentId → ms timestamp
+let pipelineStart = null;
+let timerHandle   = null;
+let ganttTimer    = null;
+let es                 = null;
+let currentPage        = 1;
+let investigationActive = false;  // true only during an active run; gates SSE DAG updates
+
+AGENTS.forEach(a => {
+  agentState[a.id] = { status: 'waiting', summary: '', completed_at: null };
+  agentLogs[a.id]  = [];
+});
+
+// ══════════════════════════════════════════════════════════════════════
+//  Page routing
+// ══════════════════════════════════════════════════════════════════════
+function showPage(n) {
+  currentPage = n;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(n === 1 ? 'page-launcher' : 'page-investigation').classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Render agent cards (Page 2)
+// ══════════════════════════════════════════════════════════════════════
+function renderCards() {
+  const grid = document.getElementById('agents-grid');
+  grid.innerHTML = '';
+  AGENTS.forEach(a => {
+    const s = agentState[a.id];
+    const card = document.createElement('div');
+    card.className = `agent-card status-${s.status}`;
+    card.id = `card-${a.id}`;
+    const canView = s.status === 'success' || s.status === 'failed';
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-icon" style="background:${a.color}22;color:${a.color}">${a.icon}</div>
+        <span class="badge badge-${s.status}">${badgeLabel(s.status)}</span>
+      </div>
+      <div class="card-name">${a.name}</div>
+      <div class="card-domain">${a.domain}</div>
+      <div class="card-summary" id="summary-${a.id}">${s.summary || 'Waiting to start…'}</div>
+      <div class="card-time" id="time-${a.id}">${s.completed_at ? fmtTime(s.completed_at) : '–'}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto">
+        <button class="card-log-toggle" onclick="toggleLog('${a.id}')" id="logtoggle-${a.id}">▶ Show logs</button>
+        <button class="card-detail-btn" id="detbtn-${a.id}" onclick="openDetail('${a.id}')" ${canView ? '' : 'disabled'}>
+          ${canView ? '→ View Findings' : '⋯ Pending'}
+        </button>
+      </div>
+      <div class="card-log-wrap" id="logwrap-${a.id}">
+        <div class="card-log" id="log-${a.id}"></div>
+      </div>`;
+    grid.appendChild(card);
+    // Re-render existing log lines
+    renderLogLines(a.id);
+  });
+}
+
+function badgeLabel(s) {
+  return { waiting:'NOT STARTED', running:'IN PROGRESS', success:'DONE', failed:'FAILED', unknown:'?' }[s] || s.toUpperCase();
+}
+
+function fmtTime(iso) {
+  if (!iso) return '–';
+  try { return new Date(iso).toLocaleTimeString(); } catch(_) { return iso; }
+}
+
+function updateCard(agentId, state) {
+  Object.assign(agentState[agentId], state);
+  const card = document.getElementById(`card-${agentId}`);
+  if (!card) return;
+  card.className = `agent-card status-${state.status}`;
+  card.querySelector('.badge').className = `badge badge-${state.status}`;
+  card.querySelector('.badge').textContent = badgeLabel(state.status);
+  const sumEl = document.getElementById(`summary-${agentId}`);
+  if (sumEl && state.summary) sumEl.textContent = state.summary;
+  const timeEl = document.getElementById(`time-${agentId}`);
+  if (timeEl && state.completed_at) timeEl.textContent = fmtTime(state.completed_at);
+
+  // Unlock "View Findings" button when complete
+  const detBtn = document.getElementById(`detbtn-${agentId}`);
+  if (detBtn && (state.status === 'success' || state.status === 'failed')) {
+    detBtn.disabled = false;
+    detBtn.textContent = '→ View Findings';
+  }
+
+  // Auto-expand log when running
+  if (state.status === 'running') {
+    const wrap = document.getElementById(`logwrap-${agentId}`);
+    const tog  = document.getElementById(`logtoggle-${agentId}`);
+    if (wrap && !wrap.classList.contains('open')) {
+      wrap.classList.add('open');
+      if (tog) tog.textContent = '▼ Hide logs';
+    }
+  }
+}
+
+function toggleLog(agentId) {
+  const wrap = document.getElementById(`logwrap-${agentId}`);
+  const tog  = document.getElementById(`logtoggle-${agentId}`);
+  if (!wrap) return;
+  const open = wrap.classList.toggle('open');
+  if (tog) tog.textContent = open ? '▼ Hide logs' : '▶ Show logs';
+}
+
+function appendLogLine(agentId, line) {
+  agentLogs[agentId].push(line);
+  if (agentLogs[agentId].length > 300) agentLogs[agentId].shift();
+  const el = document.getElementById(`log-${agentId}`);
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'log-line' +
+    (line.includes('[START]') ? ' start' :
+     line.includes('[DONE]')  ? ' done'  :
+     line.includes('[entrypoint]') ? ' entry' : '');
+  div.textContent = line;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderLogLines(agentId) {
+  const el = document.getElementById(`log-${agentId}`);
+  if (!el) return;
+  el.innerHTML = '';
+  agentLogs[agentId].forEach(line => {
+    const div = document.createElement('div');
+    div.className = 'log-line' +
+      (line.includes('[START]') ? ' start' :
+       line.includes('[DONE]')  ? ' done'  :
+       line.includes('[entrypoint]') ? ' entry' : '');
+    div.textContent = line;
+    el.appendChild(div);
+  });
+  el.scrollTop = el.scrollHeight;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  SVG DAG updates
+// ══════════════════════════════════════════════════════════════════════
+function updateDag(agentId, status) {
+  const node  = document.getElementById(`dag-${agentId}`);
+  const badge = document.getElementById(`dag-badge-${agentId}`);
+  const edge  = document.getElementById(`edge-${agentId}`);
+  if (node)  { node.className.baseVal = `dag-node ${status}`; }
+  if (badge) { badge.textContent = badgeLabel(status); }
+  if (edge) {
+    edge.classList.remove('active','done');
+    if (status === 'running')  edge.classList.add('active');
+    if (status === 'success')  edge.classList.add('done');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Progress bar
+// ══════════════════════════════════════════════════════════════════════
+function updateProgress() {
+  const done = AGENTS.filter(a => agentState[a.id].status === 'success').length;
+  const pct  = Math.round((done / AGENTS.length) * 100);
+  const el   = document.getElementById('overall-progress');
+  if (el) el.style.width = pct + '%';
+  const lLeft  = document.getElementById('progress-left');
+  const lRight = document.getElementById('progress-right');
+  if (lLeft)  lLeft.textContent  = done === AGENTS.length ? 'All agents complete ✓' : `${AGENTS.filter(a=>['running','waiting'].includes(agentState[a.id].status)).length} agent(s) running…`;
+  if (lRight) lRight.textContent = `${done} / ${AGENTS.length}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Gantt
+// ══════════════════════════════════════════════════════════════════════
+function toggleGantt() {
+  const body = document.getElementById('gantt-body');
+  const btn  = document.getElementById('gantt-toggle');
+  const open = body.classList.toggle('open');
+  if (btn) btn.textContent = (open ? '▼' : '▶') + ' Agent Timeline (Gantt)';
+}
+
+function initGanttRows() {
+  const container = document.getElementById('gantt-rows');
+  if (!container) return;
+  container.innerHTML = '';
+  AGENTS.forEach(a => {
+    const row = document.createElement('div');
+    row.className = 'gantt-row';
+    row.innerHTML = `
+      <div class="gantt-label">${a.name}</div>
+      <div class="gantt-track">
+        <div class="gantt-bar waiting" id="gbar-${a.id}" style="width:0%"></div>
+      </div>`;
+    container.appendChild(row);
+  });
+}
+
+function updateGantt() {
+  if (!pipelineStart) return;
+  const now = Date.now();
+  const total = Math.max(now - pipelineStart, 1000);
+  AGENTS.forEach(a => {
+    const bar = document.getElementById(`gbar-${a.id}`);
+    if (!bar) return;
+    const start = ganttStart[a.id] || pipelineStart;
+    const end   = ganttEnd[a.id]   || (agentState[a.id].status === 'success' || agentState[a.id].status === 'failed' ? start : now);
+    const pct   = Math.min(((end - start) / total) * 100, 100);
+    const s     = agentState[a.id].status;
+    const durSec = Math.round((end - start) / 1000);
+    bar.style.width = Math.max(pct, 1) + '%';
+    bar.className   = `gantt-bar ${s === 'waiting' ? 'waiting' : s}`;
+    bar.textContent = pct > 8 ? `${durSec}s` : '';
+  });
+  // Update axis
+  const totalSec = Math.round((now - pipelineStart) / 1000);
+  const axis = document.getElementById('gantt-axis');
+  if (axis) axis.textContent = `${totalSec}s elapsed`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Pipeline event log (Page 2)
+// ══════════════════════════════════════════════════════════════════════
+function appendPipelineLog(phase, message) {
+  const log = document.getElementById('pipeline-log');
+  if (!log) return;
+  const div = document.createElement('div');
+  div.className = 'pl-line';
+  const isErr = phase === 'error';
+  div.innerHTML = `<span class="pl-phase">[${phase}]</span><span class="pl-msg ${isErr ? 'error' : ''}">${escHtml(message)}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  // Clear placeholder if present
+  if (log.firstChild && log.firstChild.style && log.firstChild.style.color) {
+    const first = log.firstChild;
+    if (first.textContent.includes('Waiting')) log.removeChild(first);
+  }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Timer
+// ══════════════════════════════════════════════════════════════════════
+function startTimer() {
+  if (timerHandle) return;
+  pipelineStart = pipelineStart || Date.now();
+  timerHandle = setInterval(() => {
+    const s = Math.floor((Date.now() - pipelineStart) / 1000);
+    const m = Math.floor(s / 60), sec = s % 60;
+    const el = document.getElementById('elapsed');
+    if (el) el.textContent = `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  }, 1000);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  RCA Report + Playbook
+// ══════════════════════════════════════════════════════════════════════
+async function loadRcaReport() {
+  try {
+    const r = await fetch('/report');
+    if (!r.ok) return;
+    const { html } = await r.json();
+    const ph = document.getElementById('rca-placeholder');
+    const ct = document.getElementById('rca-content');
+    const sl = document.getElementById('rca-status');
+    if (ph) ph.style.display = 'none';
+    if (ct) { ct.style.display = 'block'; ct.innerHTML = html; }
+    if (sl) sl.textContent = 'Report ready';
+    toast('RCA report generated', 'success');
+  } catch(_) {}
+}
+
+async function loadPlaybook() {
+  try {
+    const r = await fetch('/workspace/remediation.yml');
+    if (!r.ok) return;
+    const text = await r.text();
+    const ph  = document.getElementById('ansible-placeholder');
+    const pre = document.getElementById('ansible-pre');
+    const code = document.getElementById('ansible-code');
+    const btn  = document.getElementById('copy-btn');
+    if (ph)   ph.style.display = 'none';
+    if (pre)  pre.style.display = 'block';
+    if (code) { code.textContent = text; hljs.highlightElement(code); }
+    if (btn)  btn.style.display = 'inline-flex';
+    toast('Ansible playbook generated', 'success');
+  } catch(_) {}
+}
+
+function copyPlaybook() {
+  const code = document.getElementById('ansible-code');
+  if (!code) return;
+  navigator.clipboard.writeText(code.textContent).then(() => {
+    const btn = document.getElementById('copy-btn');
+    if (btn) { btn.textContent = '✓ Copied'; btn.classList.add('copied'); }
+    setTimeout(() => { if (btn) { btn.textContent = '⎘ Copy'; btn.classList.remove('copied'); } }, 2000);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Toast
+// ══════════════════════════════════════════════════════════════════════
+function toast(msg, type='info') {
+  const w = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  w.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(() => w.removeChild(t), 300); }, 4000);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Pipeline status (Page 1 pre-flight) — auto-polls every 10s
+// ══════════════════════════════════════════════════════════════════════
+let psPollerHandle = null;
+
+async function loadPipelineStatus() {
+  try {
+    const r = await fetch('/api/pipeline-status');
+    if (!r.ok) return;
+    const { agents } = await r.json();
+    const rows = document.getElementById('ps-rows');
+    if (!rows) return;
+    rows.innerHTML = '';
+    AGENTS.forEach(a => {
+      const info = agents[a.id] || { status: 'waiting' };
+      const row = document.createElement('div');
+      row.className = 'ps-row';
+      row.innerHTML = `<span class="ps-agent">${a.name}</span><span class="ps-badge ${info.status}">${badgeLabel(info.status)}</span>`;
+      rows.appendChild(row);
+    });
+
+    // Update trigger button hint
+    const anyActive = AGENTS.some(a => agents[a.id]?.status === 'running');
+    const anyDone   = AGENTS.some(a => agents[a.id]?.status === 'success');
+    const btn   = document.getElementById('trigger-btn');
+    const label = document.getElementById('trigger-label');
+    const hint  = document.getElementById('trigger-hint');
+    if (anyActive) {
+      if (btn)   btn.classList.add('running');
+      if (label) label.textContent = 'Investigation Running…';
+      if (hint)  hint.textContent  = 'Click to re-run and override existing results';
+    } else if (anyDone) {
+      if (label) label.textContent = '▶ Re-run Investigation';
+      if (hint)  hint.textContent  = 'Previous results will remain visible until new ones arrive';
+    }
+
+    // Update refresh indicator
+    const ind = document.getElementById('ps-refresh-indicator');
+    if (ind) ind.textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+    // Enable download button only if aggregator succeeded
+    const dlBtn = document.getElementById('download-btn');
+    if (dlBtn) dlBtn.disabled = !(agents['rca-aggregator']?.status === 'success');
+  } catch(_) {}
+}
+
+function startPsPoller() {
+  if (psPollerHandle) return;
+  psPollerHandle = setInterval(loadPipelineStatus, 10000);
+}
+
+// ── Manual refresh — polls pipeline-status and syncs all agent cards/DAG ──
+async function manualRefresh() {
+  const btn  = document.getElementById('refresh-btn');
+  const icon = document.getElementById('refresh-icon');
+  if (btn)  btn.disabled = true;
+  if (icon) { icon.style.display = 'inline-block'; icon.style.animation = 'spin 0.7s linear infinite'; }
+
+  try {
+    const r = await fetch('/api/pipeline-status');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const { agents } = await r.json();
+
+    // Ensure investigation view is active so card/DAG updates render
+    investigationActive = true;
+
+    // If we're still on page 1, switch to the investigation view
+    if (currentPage === 1) {
+      showPage(2);
+      renderCards();
+      initGanttRows();
+    }
+
+    // Sync every agent
+    AGENTS.forEach(a => {
+      const info = agents[a.id] || { status: 'waiting', summary: '', completed_at: null };
+      updateCard(a.id, { status: info.status, summary: info.summary || '', completed_at: info.completed_at || null });
+      updateDag(a.id, info.status);
+    });
+    updateProgress();
+
+    // If aggregator succeeded, reload RCA and playbook panels
+    if (agents['rca-aggregator']?.status === 'success') {
+      loadRcaReport();
+      loadPlaybook();
+    }
+
+    appendPipelineLog('refresh', 'Status refreshed at ' + new Date().toLocaleTimeString());
+    toast('Status refreshed', 'success');
+  } catch(e) {
+    toast('Refresh failed: ' + e.message, 'error');
+  } finally {
+    if (btn)  btn.disabled = false;
+    if (icon) { icon.style.animation = ''; }
+  }
+}
+
+// ── DAG node click — opens detail drawer if findings available ──────────
+function dagNodeClick(agentId) {
+  const s = agentState[agentId];
+  if (s && (s.status === 'success' || s.status === 'failed')) {
+    openDetail(agentId);
+  } else {
+    toast(`${agentId} — findings not ready yet`, 'info');
+  }
+}
+
+// ── Reset workspace (delete findings without launching jobs) ────────────
+async function resetWorkspace() {
+  const btn = document.getElementById('reset-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Resetting…'; }
+  try {
+    const r = await fetch('/api/reset', { method: 'POST' });
+    const body = await r.json();
+    toast(body.message || 'Workspace reset', 'success');
+    await loadPipelineStatus();
+  } catch(e) {
+    toast('Reset failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✕ Reset Workspace'; }
+  }
+}
+
+// ── Download report (rca-report.md + remediation.yml as text blob) ──────
+async function downloadReport() {
+  try {
+    const [rcaRes, playRes] = await Promise.all([
+      fetch('/workspace/rca-report.md'),
+      fetch('/workspace/remediation.yml'),
+    ]);
+    if (!rcaRes.ok) { toast('RCA report not ready', 'error'); return; }
+    const rca     = await rcaRes.text();
+    const ansible = playRes.ok ? await playRes.text() : '# playbook not available';
+    const blob = new Blob([
+      '# ============================\n# RCA REPORT\n# ============================\n\n',
+      rca,
+      '\n\n\n# ============================\n# ANSIBLE REMEDIATION PLAYBOOK\n# ============================\n\n',
+      ansible,
+    ], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sre-rca-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Report downloaded', 'success');
+  } catch(e) {
+    toast('Download failed: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Trigger investigation
+// ══════════════════════════════════════════════════════════════════════
+async function startInvestigation() {
+  const btn   = document.getElementById('trigger-btn');
+  const label = document.getElementById('trigger-label');
+  if (btn)   { btn.disabled = true; btn.classList.add('running'); }
+  if (label) label.textContent = 'Launching…';
+
+  // Switch to Page 2 immediately
+  showPage(2);
+  renderCards();
+  initGanttRows();
+  if (!es) connectSSE();
+
+  // Activate real-time DAG updates and reset all nodes to waiting (red)
+  investigationActive = true;
+  AGENTS.forEach(a => updateDag(a.id, 'waiting'));
+
+  // Start pipeline timer
+  pipelineStart = Date.now();
+  startTimer();
+  if (ganttTimer) clearInterval(ganttTimer);
+  ganttTimer = setInterval(updateGantt, 1000);
+
+  // Reset Gantt state
+  Object.keys(ganttStart).forEach(k => delete ganttStart[k]);
+  Object.keys(ganttEnd).forEach(k => delete ganttEnd[k]);
+
+  // Call trigger
+  try {
+    const r = await fetch('/api/trigger', { method:'POST', headers:{'Content-Type':'application/json'} });
+    const body = await r.json();
+    appendPipelineLog('trigger', body.message || 'Pipeline triggered');
+    toast('Investigation started', 'success');
+  } catch(e) {
+    appendPipelineLog('error', 'Failed to trigger pipeline: ' + e.message);
+    toast('Failed to start investigation', 'error');
+    if (btn) btn.disabled = false;
+    if (label) label.textContent = '▶ Start Investigation';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  SSE connection
+// ══════════════════════════════════════════════════════════════════════
+function connectSSE() {
+  if (es) return;
+  es = new EventSource('/events');
+
+  es.onopen = () => {
+    document.getElementById('conn-dot').classList.add('ok');
+    document.getElementById('conn-label').textContent = 'Live';
+  };
+
+  es.onmessage = e => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch(_) { return; }
+
+    // ── agent_update ──────────────────────────────────────────────
+    if (msg.type === 'agent_update') {
+      const { agentId, status, summary, completed_at } = msg;
+      if (!agentId) return;
+
+      // Auto-activate investigation view for any live running event,
+      // regardless of whether the user triggered via UI or externally (oc apply).
+      if (status === 'running' || status === 'success' || status === 'failed') {
+        investigationActive = true;
+      }
+
+      // If we're on page 1 and this is a running update, auto-switch to page 2
+      if (currentPage === 1 && status === 'running') {
+        showPage(2);
+        renderCards();
+        initGanttRows();
+        startTimer();
+        if (!ganttTimer) ganttTimer = setInterval(updateGantt, 1000);
+      }
+
+      updateCard(agentId, { status, summary, completed_at });
+      updateDag(agentId, status);
+      updateProgress();
+
+      // Gantt tracking
+      if (status === 'running' && !ganttStart[agentId]) ganttStart[agentId] = Date.now();
+      if ((status === 'success' || status === 'failed') && !ganttEnd[agentId]) ganttEnd[agentId] = Date.now();
+
+      if (status === 'success' && agentId === 'rca-aggregator') {
+        loadRcaReport();
+        loadPlaybook();
+        if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+        if (ganttTimer)  { clearInterval(ganttTimer);  ganttTimer  = null; }
+        updateGantt();
+        toast('Investigation complete', 'success');
+        document.getElementById('footer-ts').textContent = 'Completed ' + new Date().toLocaleTimeString();
+      }
+    }
+
+    // ── pod_log ───────────────────────────────────────────────────
+    if (msg.type === 'pod_log') {
+      const { agentId, line } = msg;
+      if (!agentId || !line) return;
+      appendLogLine(agentId, line);
+      // Gantt: start timer on first log line
+      if (!ganttStart[agentId]) ganttStart[agentId] = Date.now();
+    }
+
+    // ── pipeline_event ────────────────────────────────────────────
+    if (msg.type === 'pipeline_event') {
+      appendPipelineLog(msg.phase || 'info', msg.message || '');
+      if (msg.phase === 'reset') {
+        // Reset all agent card and DAG states
+        investigationActive = false;
+        AGENTS.forEach(a => {
+          agentState[a.id] = { status: 'waiting', summary: '', completed_at: null };
+          agentLogs[a.id]  = [];
+          updateDag(a.id, 'waiting');
+        });
+        renderCards();
+        initGanttRows();
+        updateProgress();
+      }
+    }
+  };
+
+  es.onerror = () => {
+    document.getElementById('conn-dot').classList.remove('ok');
+    document.getElementById('conn-label').textContent = 'Reconnecting…';
+    es.close();
+    es = null;
+    setTimeout(connectSSE, 5000);
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Detail Drawer — open / close / render
+// ══════════════════════════════════════════════════════════════════════
+
+function openDetail(agentId) {
+  const agent = AGENTS.find(a => a.id === agentId);
+  if (!agent) return;
+
+  // Header
+  document.getElementById('drawer-icon').textContent  = agent.icon;
+  document.getElementById('drawer-icon').style.cssText = `background:${agent.color}22;color:${agent.color}`;
+  document.getElementById('drawer-title').textContent    = agent.name + ' — Findings';
+  document.getElementById('drawer-subtitle').textContent = agent.domain + ' · ' + (agentState[agentId].completed_at ? fmtTime(agentState[agentId].completed_at) : '');
+  document.getElementById('drawer-body').innerHTML =
+    `<div class="placeholder"><div class="ph-icon">⏳</div><div class="ph-text">Loading findings…</div></div>`;
+  document.getElementById('detail-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  fetch(`/api/findings/${agentId}`)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(data => renderDetailBody(agentId, agent, data))
+    .catch(err => {
+      document.getElementById('drawer-body').innerHTML =
+        `<div class="placeholder"><div class="ph-icon">⚠️</div><div class="ph-text">Could not load findings (${err})</div></div>`;
+    });
+}
+
+function closeDetail() {
+  document.getElementById('detail-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Close on Escape key
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+// ── Master dispatcher — routes to the correct renderer ────────────────
+function renderDetailBody(agentId, agent, data) {
+  const body = document.getElementById('drawer-body');
+  let html = '';
+
+  if (agentId === 'instana-query')   html = renderInstanaQuery(data.raw, agent);
+  else if (agentId === 'instana-rca') html = renderInstanaRca(data.raw, agent);
+  else if (agentId === 'openshift-check') html = renderOcpCheck(data.raw, agent);
+  else if (agentId === 'infra-check')     html = renderInfraCheck(data.raw, agent);
+  else if (agentId === 'rca-aggregator')  html = renderAggregator(data, agent);
+  else html = `<pre style="color:#abb2bf;font-size:12px">${escHtml(JSON.stringify(data.raw, null, 2))}</pre>`;
+
+  body.innerHTML = html;
+  // Re-apply hljs to any yaml blocks
+  body.querySelectorAll('code.language-yaml').forEach(el => hljs.highlightElement(el));
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function sevClass(sev) {
+  if (sev >= 10 || sev === 'critical') return 'critical';
+  if (sev >= 5  || sev === 'warning')  return 'warning';
+  return 'ok';
+}
+function sevLabel(sev) {
+  if (sev >= 10 || sev === 'critical') return '🔴 Critical';
+  if (sev >= 5  || sev === 'warning')  return '🟡 Warning';
+  return '🟢 OK';
+}
+function pct2class(pct) {
+  return pct >= 90 ? 'crit' : pct >= 75 ? 'warn' : 'ok';
+}
+function metricBar(label, pct, unit='%') {
+  const cls = pct2class(pct);
+  return `<div class="metric-row">
+    <div class="metric-label">${escHtml(label)}</div>
+    <div class="metric-track"><div class="metric-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+    <div class="metric-val">${pct}${unit}</div>
+  </div>`;
+}
+function kv(label, value, cls='') {
+  return `<div class="det-kv-item"><div class="det-kv-label">${escHtml(label)}</div><div class="det-kv-value ${cls}">${value}</div></div>`;
+}
+function rawToggle(id, obj) {
+  return `<button class="raw-toggle" onclick="toggleRaw('${id}')">{ } Show raw JSON</button>
+  <div class="raw-json-wrap" id="raw-${id}"><pre>${escHtml(JSON.stringify(obj, null, 2))}</pre></div>`;
+}
+function toggleRaw(id) {
+  const el = document.getElementById(`raw-${id}`);
+  if (el) el.classList.toggle('open');
+}
+function fmtTs(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString(undefined, { dateStyle:'medium', timeStyle:'medium' });
+  } catch(_) { return iso; }
+}
+function latMs(ms) {
+  if (!ms && ms !== 0) return '—';
+  if (ms >= 1000) return (ms/1000).toFixed(1) + 's';
+  return ms + 'ms';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Renderer 1 — Instana Query
+// ══════════════════════════════════════════════════════════════════════
+function renderInstanaQuery(d, agent) {
+  if (!d) return '<p style="color:var(--cds-text-helper)">No data available.</p>';
+
+  const totalEvts   = d.events_queried   || d.total_events   || '—';
+  const openEvts    = d.robot_shop_open_events || d.open_events || '—';
+  const incidents   = Array.isArray(d.incidents) ? d.incidents : [];
+  const topInc      = d.top_incident || incidents[0] || null;
+
+  let heroText = d.summary || `Instana was queried for all active events and incidents on the Robot Shop application.`;
+
+  let topBlock = '';
+  if (topInc) {
+    const sc = sevClass(topInc.severity_raw ?? topInc.severity);
+    topBlock = `
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">⚡</span>Top Active Incident</div>
+      <div class="det-list">
+        <div class="det-list-item">
+          <div class="det-list-left ${sc}"></div>
+          <div class="det-list-content">
+            <div class="det-list-title">${escHtml(topInc.title || 'Unknown incident')}</div>
+            <div class="det-list-meta">
+              <span class="sev-chip ${sc}">${sevLabel(topInc.severity_raw ?? topInc.severity)}</span>
+              ${topInc.service ? `<span style="color:var(--cds-text-helper)">Service: <strong style="color:var(--cds-text-primary)">${escHtml(topInc.service)}</strong></span>` : ''}
+              ${topInc.state ? `<span>State: ${escHtml(topInc.state)}</span>` : ''}
+              ${topInc.start ? `<span>Since: ${fmtTs(topInc.start)}</span>` : ''}
+            </div>
+            ${topInc.detail ? `<div class="det-list-desc">${escHtml(topInc.detail)}</div>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // All incidents list
+  let allBlock = '';
+  if (incidents.length > 0) {
+    const rows = incidents.slice(0, 15).map(inc => {
+      const sc = sevClass(inc.severity_raw ?? inc.severity);
+      return `<div class="det-list-item">
+        <div class="det-list-left ${sc}"></div>
+        <div class="det-list-content">
+          <div class="det-list-title">${escHtml(inc.title || inc.id || 'Event')}</div>
+          <div class="det-list-meta">
+            <span class="sev-chip ${sc}">${sevLabel(inc.severity_raw ?? inc.severity)}</span>
+            ${inc.service ? `<span>Service: <strong style="color:var(--cds-text-primary)">${escHtml(inc.service)}</strong></span>` : ''}
+            ${inc.entity_label ? `<span>${escHtml(inc.entity_label)}</span>` : ''}
+            ${inc.start ? `<span>${fmtTs(inc.start)}</span>` : ''}
+          </div>
+          ${inc.fix_suggestion ? `<div class="det-list-desc">💡 ${escHtml(inc.fix_suggestion)}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    allBlock = `<div class="det-section">
+      <div class="det-section-title"><span class="det-icon">📋</span>All Active Incidents (${Math.min(incidents.length,15)} of ${incidents.length})</div>
+      <div class="det-list">${rows}</div>
+    </div>`;
+  }
+
+  return `
+    <div class="det-hero" style="--agent-color:${agent.color}">${escHtml(heroText)}</div>
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">📊</span>Overview</div>
+      <div class="det-kv">
+        ${kv('Total events queried', String(totalEvts))}
+        ${kv('Robot Shop open events', String(openEvts), openEvts > 50 ? 'crit' : openEvts > 10 ? 'warn' : 'ok')}
+        ${kv('Completed at', fmtTs(d.completed_at), 'neutral')}
+        ${kv('Status', d.status || '—', d.status === 'success' ? 'ok' : 'crit')}
+      </div>
+    </div>
+    ${topBlock}
+    ${allBlock}
+    ${rawToggle('iq', d)}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Renderer 2 — Instana RCA
+// ══════════════════════════════════════════════════════════════════════
+function renderInstanaRca(d, agent) {
+  if (!d) return '<p style="color:var(--cds-text-helper)">No data available.</p>';
+
+  const affected  = Array.isArray(d.affected_services) ? d.affected_services : [];
+  const timeline  = Array.isArray(d.timeline)          ? d.timeline          : [];
+  const hypothesis= d.root_cause_hypothesis || d.root_cause || '';
+  const rcCtx     = d.robot_shop_context    || {};
+
+  // Affected services chips
+  const svcChips = affected.map(s =>
+    `<span style="background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle-01);padding:3px 10px;font-size:11px;margin:2px;display:inline-block;">${escHtml(s)}</span>`
+  ).join('');
+
+  // Timeline events
+  const tlRows = timeline.slice(0, 20).map(ev => {
+    const sc = sevClass(ev.severity ?? ev.severity_raw ?? 5);
+    return `<div class="det-list-item">
+      <div class="det-list-left ${sc}"></div>
+      <div class="det-list-content">
+        <div class="det-list-title">${escHtml(ev.entity || ev.service || 'Event')} — ${escHtml(ev.event_type || ev.title || '')}</div>
+        <div class="det-list-meta">
+          ${ev.timestamp ? `<span>🕐 ${fmtTs(ev.timestamp)}</span>` : ''}
+          ${ev.state ? `<span>State: ${escHtml(ev.state)}</span>` : ''}
+          ${ev.severity !== undefined ? `<span class="sev-chip ${sc}">${sevLabel(ev.severity)}</span>` : ''}
+        </div>
+        ${ev.description ? `<div class="det-list-desc">${escHtml(ev.description)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Top call metrics table
+  const calls = Array.isArray(d.call_groups) ? d.call_groups : (Array.isArray(rcCtx.slow_endpoints) ? rcCtx.slow_endpoints : []);
+  let callTable = '';
+  if (calls.length > 0) {
+    const rows = calls.slice(0, 10).map(c => {
+      const lat = c.p95_latency_ms ?? c.latency_ms ?? c.latency ?? null;
+      const errPct = c.error_rate_pct ?? c.error_pct ?? null;
+      const latCls = lat > 5000 ? 'crit' : lat > 1000 ? 'warn' : 'ok';
+      const errCls = errPct > 10 ? 'crit' : errPct > 1 ? 'warn' : 'ok';
+      return `<tr>
+        <td class="mono">${escHtml(c.endpoint || c.name || c.service || '—')}</td>
+        <td class="mono">${escHtml(c.service || c.application || '—')}</td>
+        <td class="mono ${latCls}">${lat !== null ? latMs(lat) : '—'}</td>
+        <td class="mono ${errCls}">${errPct !== null ? errPct + '%' : '—'}</td>
+        <td class="mono">${c.call_count ?? c.calls ?? '—'}</td>
+      </tr>`;
+    }).join('');
+    callTable = `<div class="det-section">
+      <div class="det-section-title"><span class="det-icon">🔗</span>Slowest Endpoints</div>
+      <table class="det-table">
+        <thead><tr><th>Endpoint</th><th>Service</th><th>P95 Latency</th><th>Error Rate</th><th>Calls</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+
+  return `
+    <div class="det-hero" style="--agent-color:${agent.color}">${escHtml(d.summary || 'Deep root cause analysis from Instana telemetry and call-group data.')}</div>
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">🔬</span>Root Cause Hypothesis</div>
+      <div style="background:var(--cds-layer-01);border:1px solid var(--cds-border-subtle-01);padding:1rem;font-size:13px;color:var(--cds-text-secondary);line-height:1.7;border-left:3px solid ${agent.color}">
+        ${hypothesis ? escHtml(hypothesis) : '<em style="color:var(--cds-text-helper)">No hypothesis recorded.</em>'}
+      </div>
+    </div>
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">🏗</span>Affected Services (${affected.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${svcChips || '<span style="color:var(--cds-text-helper)">None identified</span>'}</div>
+    </div>
+    ${callTable}
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">⏱</span>Incident Timeline (${timeline.length} events)</div>
+      <div class="det-list">${tlRows || '<p style="color:var(--cds-text-helper);font-size:13px">No timeline events.</p>'}</div>
+    </div>
+    ${rawToggle('irca', d)}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Renderer 3 — OpenShift Check
+// ══════════════════════════════════════════════════════════════════════
+function renderOcpCheck(d, agent) {
+  if (!d) return '<p style="color:var(--cds-text-helper)">No data available.</p>';
+
+  const nodes         = Array.isArray(d.nodes)          ? d.nodes          : [];
+  const unhealthy     = Array.isArray(d.unhealthy_pods)  ? d.unhealthy_pods  : [];
+  const warnings      = Array.isArray(d.warning_events)  ? d.warning_events  : [];
+  const anomalies     = Array.isArray(d.anomalies)        ? d.anomalies        : [];
+  const robotPods     = Array.isArray(d.robot_shop_pods)  ? d.robot_shop_pods  : [];
+
+  // Node table
+  const nodeRows = nodes.map(n => {
+    const ready = n.status === 'Ready' || n.ready === true;
+    const cpuPct = parseInt(n.cpu_pct  ?? n.cpu  ?? 0);
+    const memPct = parseInt(n.mem_pct  ?? n.memory ?? 0);
+    return `<tr>
+      <td class="mono">${escHtml(n.name || '—')}</td>
+      <td><span class="${ready ? 'ok' : 'crit'}" style="font-weight:600">${ready ? '✓ Ready' : '✗ NotReady'}</span></td>
+      <td class="mono">${escHtml(n.roles || n.role || '—')}</td>
+      <td class="mono ${pct2class(cpuPct)}">${n.cpu_pct ?? n.cpu ?? '—'}</td>
+      <td class="mono ${pct2class(memPct)}">${n.mem_pct ?? n.memory ?? '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const nodeTable = nodes.length ? `<div class="det-section">
+    <div class="det-section-title"><span class="det-icon">🖥</span>Cluster Nodes (${nodes.length})</div>
+    <table class="det-table">
+      <thead><tr><th>Node</th><th>Status</th><th>Role</th><th>CPU</th><th>Memory</th></tr></thead>
+      <tbody>${nodeRows}</tbody>
+    </table>
+  </div>` : '';
+
+  // Robot Shop pods table
+  const rpRows = robotPods.map(p => {
+    const ready = p.ready === true || p.status === 'Running';
+    const sc = ready ? 'ok' : 'crit';
+    return `<tr>
+      <td class="mono">${escHtml(p.name || p.pod || '—')}</td>
+      <td><span class="${sc}" style="font-weight:600">${escHtml(p.status || (ready ? 'Running' : 'Not Ready'))}</span></td>
+      <td class="mono">${escHtml(p.restarts !== undefined ? String(p.restarts) : '—')}</td>
+      <td class="mono">${escHtml(p.age || p.started || '—')}</td>
+    </tr>`;
+  }).join('');
+  const rpTable = robotPods.length ? `<div class="det-section">
+    <div class="det-section-title"><span class="det-icon">🚀</span>Robot Shop Pods (${robotPods.length})</div>
+    <table class="det-table">
+      <thead><tr><th>Pod</th><th>Status</th><th>Restarts</th><th>Age</th></tr></thead>
+      <tbody>${rpRows}</tbody>
+    </table>
+  </div>` : '';
+
+  // Warning events
+  const warnItems = warnings.slice(0, 15).map(w => `<div class="det-list-item">
+    <div class="det-list-left warning"></div>
+    <div class="det-list-content">
+      <div class="det-list-title">${escHtml(w.reason || w.type || 'Warning')}</div>
+      <div class="det-list-meta">
+        ${w.namespace ? `<span>${escHtml(w.namespace)}</span>` : ''}
+        ${w.object || w.name ? `<span>${escHtml(w.object || w.name)}</span>` : ''}
+        ${w.count ? `<span>×${w.count}</span>` : ''}
+        ${w.last_seen || w.firstTime ? `<span>${fmtTs(w.last_seen || w.firstTime)}</span>` : ''}
+      </div>
+      ${w.message ? `<div class="det-list-desc">${escHtml(w.message)}</div>` : ''}
+    </div>
+  </div>`).join('');
+  const warnSection = warnings.length ? `<div class="det-section">
+    <div class="det-section-title"><span class="det-icon">⚠️</span>Warning Events (${warnings.length})</div>
+    <div class="det-list">${warnItems}</div>
+  </div>` : '';
+
+  // Anomalies
+  const anomItems = anomalies.map(a => `<div class="det-list-item">
+    <div class="det-list-left critical"></div>
+    <div class="det-list-content">
+      <div class="det-list-title">${escHtml(a.title || a.type || 'Anomaly')}</div>
+      <div class="det-list-desc">${escHtml(a.description || a.detail || '')}</div>
+    </div>
+  </div>`).join('');
+  const anomSection = anomalies.length ? `<div class="det-section">
+    <div class="det-section-title"><span class="det-icon">🔴</span>Anomalies Detected (${anomalies.length})</div>
+    <div class="det-list">${anomItems}</div>
+  </div>` : '';
+
+  return `
+    <div class="det-hero" style="--agent-color:${agent.color}">${escHtml(d.summary || 'OpenShift cluster health check covering nodes, pods, operators and events.')}</div>
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">📡</span>At a Glance</div>
+      <div class="det-kv">
+        ${kv('Cluster API', d.cluster_api || '—', 'neutral')}
+        ${kv('Total nodes', String(nodes.length))}
+        ${kv('Unhealthy pods', String(unhealthy.length), unhealthy.length > 0 ? 'crit' : 'ok')}
+        ${kv('Warning events', String(warnings.length), warnings.length > 5 ? 'warn' : 'ok')}
+        ${kv('Anomalies', String(anomalies.length), anomalies.length > 0 ? 'crit' : 'ok')}
+        ${kv('Completed at', fmtTs(d.completed_at), 'neutral')}
+      </div>
+    </div>
+    ${nodeTable}
+    ${rpTable}
+    ${anomSection}
+    ${warnSection}
+    ${rawToggle('ocp', d)}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Renderer 4 — Infra Check
+// ══════════════════════════════════════════════════════════════════════
+function renderInfraCheck(d, agent) {
+  if (!d) return '<p style="color:var(--cds-text-helper)">No data available.</p>';
+
+  const storage   = d.storage   || {};
+  const network   = d.network   || {};
+  const server    = d.server    || {};
+  const anomalies = Array.isArray(d.anomalies) ? d.anomalies : [];
+  const topAnom   = d.top_anomaly || anomalies[0] || null;
+  const simBanner = d.simulated
+    ? `<div style="background:#f1c21b11;border:1px solid #f1c21b44;padding:.5rem 1rem;font-size:11px;color:#f1c21b;margin-bottom:1.25rem">⚠ Infrastructure data is <strong>simulated</strong> — representative of a real-world scenario</div>`
+    : '';
+
+  // Storage volumes
+  const vols = Array.isArray(storage.volumes) ? storage.volumes : [];
+  const volBars = vols.map(v =>
+    metricBar(`${v.name || 'Volume'} — capacity`, v.used_pct || 0) +
+    metricBar(`${v.name || 'Volume'} — IOPS`, v.iops_util_pct || 0) +
+    `<div style="font-size:11px;color:var(--cds-text-helper);margin-bottom:.75rem;padding-left:140px">Latency: <span style="color:var(--cds-text-secondary)">${v.latency_ms || 0}ms</span>${v.service_hint ? ' · ' + escHtml(v.service_hint) : ''}</div>`
+  ).join('');
+
+  // Server metrics
+  const srvNodes = Array.isArray(server.nodes) ? server.nodes : (server.host ? [server] : []);
+  const srvBars = srvNodes.map(n =>
+    `<div style="font-size:11px;font-weight:600;color:var(--cds-text-primary);margin:.6rem 0 .3rem">${escHtml(n.host || n.name || 'Node')}</div>` +
+    metricBar('CPU utilisation', n.cpu_util_pct || n.cpu_pct || 0) +
+    metricBar('Memory utilisation', n.mem_util_pct || n.mem_pct || 0) +
+    (n.load_avg_15m ? `<div style="font-size:11px;color:var(--cds-text-helper);margin-bottom:.5rem;padding-left:140px">Load avg (15m): <span style="color:${(n.load_avg_15m>8?'var(--cds-support-error)':'var(--cds-text-secondary)')}">${n.load_avg_15m}</span></div>` : '')
+  ).join('');
+
+  // Network
+  const netIfaces = Array.isArray(network.interfaces) ? network.interfaces : (network.iface ? [network] : []);
+  const netBars = netIfaces.map(i =>
+    `<div style="font-size:11px;font-weight:600;color:var(--cds-text-primary);margin:.6rem 0 .3rem">${escHtml(i.host || i.iface || 'Interface')}</div>` +
+    metricBar(`Bandwidth (${i.iface || 'NIC'})`, i.bandwidth_util_pct || i.bw_pct || 0) +
+    (i.errors_per_min !== undefined ? `<div style="font-size:11px;color:var(--cds-text-helper);margin-bottom:.5rem;padding-left:140px">NIC errors: <span style="color:${i.errors_per_min>5?'var(--cds-support-error)':'var(--cds-support-success)'}"><strong>${i.errors_per_min}/min</strong></span>${i.packet_loss_pct !== undefined ? ` · Packet loss: ${i.packet_loss_pct}%` : ''}</div>` : '')
+  ).join('');
+
+  // Anomalies list
+  const anomItems = anomalies.map(a => {
+    const sc = sevClass(a.severity || a.level || 'warning');
+    return `<div class="det-list-item">
+      <div class="det-list-left ${sc}"></div>
+      <div class="det-list-content">
+        <div class="det-list-title">${escHtml(a.title || a.type || 'Anomaly')}</div>
+        <div class="det-list-meta">
+          <span class="sev-chip ${sc}">${sevLabel(a.severity || a.level || 'warning')}</span>
+          ${a.domain ? `<span>${escHtml(a.domain)}</span>` : ''}
+          ${a.metric ? `<span>${escHtml(a.metric)}: <strong style="color:var(--cds-text-primary)">${a.value ?? ''}</strong></span>` : ''}
+        </div>
+        ${a.robot_shop_impact ? `<div class="det-list-desc">🏪 Robot Shop impact: ${escHtml(a.robot_shop_impact)}</div>` : ''}
+        ${a.description ? `<div class="det-list-desc">${escHtml(a.description)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Top anomaly hero
+  let topBlock = '';
+  if (topAnom) {
+    topBlock = `<div class="det-section">
+      <div class="det-section-title"><span class="det-icon">🔥</span>Primary Anomaly</div>
+      <div style="background:var(--cds-layer-01);border:1px solid var(--cds-support-error);padding:1rem;margin-bottom:.75rem">
+        <div style="font-size:14px;font-weight:600;color:var(--cds-text-primary);margin-bottom:.5rem">${escHtml(topAnom.title || topAnom.type || 'Top anomaly')}</div>
+        ${topAnom.robot_shop_impact ? `<div style="font-size:13px;color:var(--cds-text-secondary);margin-bottom:.4rem">🏪 <strong style="color:var(--cds-text-primary)">Robot Shop impact:</strong> ${escHtml(topAnom.robot_shop_impact)}</div>` : ''}
+        ${topAnom.description ? `<div style="font-size:13px;color:var(--cds-text-secondary)">${escHtml(topAnom.description)}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  return `
+    ${simBanner}
+    <div class="det-hero" style="--agent-color:${agent.color}">${escHtml(d.summary || 'Infrastructure telemetry analysis covering storage, network, and compute resources.')}</div>
+    ${topBlock}
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">💾</span>Storage</div>
+      ${volBars || '<p style="color:var(--cds-text-helper);font-size:13px">No storage data.</p>'}
+    </div>
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">🖥</span>Server / Compute</div>
+      ${srvBars || '<p style="color:var(--cds-text-helper);font-size:13px">No server data.</p>'}
+    </div>
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">🌐</span>Network</div>
+      ${netBars || '<p style="color:var(--cds-text-helper);font-size:13px">No network data.</p>'}
+    </div>
+    <div class="det-section">
+      <div class="det-section-title"><span class="det-icon">⚠️</span>All Anomalies (${anomalies.length})</div>
+      <div class="det-list">${anomItems || '<p style="color:var(--cds-text-helper);font-size:13px">None detected.</p>'}</div>
+    </div>
+    ${rawToggle('infra', d)}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Renderer 5 — RCA Aggregator (Markdown report)
+// ══════════════════════════════════════════════════════════════════════
+function renderAggregator(data, agent) {
+  if (data.type === 'markdown') {
+    const clean = data.raw.replace(/<!--.*?-->/gs, '').trim();
+    return `
+      <div class="det-hero" style="--agent-color:${agent.color}">
+        The RCA Aggregator synthesised findings from all 4 parallel agents into a unified incident report and Ansible remediation playbook.
+      </div>
+      <div id="rca-md-content" style="font-size:13px;line-height:1.7">${marked.parse(clean)}</div>
+      <div style="margin-top:1rem">
+        <button class="raw-toggle" onclick="document.getElementById('raw-agg').classList.toggle('open')">{ } Show raw Markdown</button>
+        <div class="raw-json-wrap" id="raw-agg"><pre>${escHtml(clean)}</pre></div>
+      </div>`;
+  }
+  return `<pre style="color:#abb2bf;font-size:12px">${escHtml(JSON.stringify(data.raw, null, 2))}</pre>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Initialise
+// ══════════════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  renderCards();
+  initGanttRows();
+  loadPipelineStatus();
+  startPsPoller();
+  connectSSE();
+  document.getElementById('footer-ts').textContent = new Date().toLocaleString();
+  // Download button starts disabled until findings confirmed
+  const dlBtn = document.getElementById('download-btn');
+  if (dlBtn) dlBtn.disabled = true;
+});
+</script>
+</body>
+</html>
