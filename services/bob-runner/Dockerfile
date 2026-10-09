@@ -8,10 +8,10 @@ RUN microdnf install -y tar gzip ca-certificates shadow-utils python3 python3-pi
     microdnf install -y nodejs git && \
     microdnf clean all
 
-# Copy and install bobshell CLI globally (2.0.5 — required for BOB_GATEWAY_URL + recoverable error fix)
+# Copy and install bobshell CLI globally (2.0.2 — closest version to on-prem Bob server 2.0.0)
 # Build context must be workspace root: podman build -f services/bob-runner/Dockerfile .
-COPY container/bobshell-2.0.5.tgz /tmp/
-RUN npm install -g /tmp/bobshell-2.0.5.tgz && rm -f /tmp/bobshell-2.0.5.tgz
+COPY container/bobshell-2.0.2.tgz /tmp/
+RUN npm install -g /tmp/bobshell-2.0.2.tgz && rm -f /tmp/bobshell-2.0.2.tgz
 
 WORKDIR /opt/app-root/src
 
