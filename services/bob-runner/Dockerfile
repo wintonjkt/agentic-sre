@@ -3,11 +3,10 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 USER 0
 
 # Install Node.js 22 from Nodesource + git, tar, ca-certificates, python3 (for mode baking)
-RUN microdnf install -y tar gzip ca-certificates shadow-utils python3 python3-pip && \
+RUN microdnf install -y tar gzip ca-certificates shadow-utils python3 python3-pip python3-pyyaml && \
     curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - && \
     microdnf install -y nodejs git && \
-    microdnf clean all && \
-    pip3 install --break-system-packages pyyaml
+    microdnf clean all
 
 # Copy and install bobshell CLI globally (2.0.5 — required for BOB_GATEWAY_URL + recoverable error fix)
 # Build context must be workspace root: podman build -f services/bob-runner/Dockerfile .
