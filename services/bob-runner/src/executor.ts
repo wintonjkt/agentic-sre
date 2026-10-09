@@ -22,6 +22,8 @@ export function executeBobPrompt(options: BobRunOptions): Promise<BobRunResult> 
       timeoutMs = 180000,
     } = options;
 
+    const apiKey = process.env.BOBSHELL_API_KEY;
+
     const args: string[] = [
       "run",
       prompt,
@@ -32,9 +34,8 @@ export function executeBobPrompt(options: BobRunOptions): Promise<BobRunResult> 
       "json",
       "--max-turns",
       "20",
+      ...(apiKey ? ["--auth-method", "api-key"] : []),
     ];
-
-    const apiKey = process.env.BOBSHELL_API_KEY;
     const gatewayUrl = process.env.BOB_GATEWAY_URL;
     const bobBin = process.env.BOB_BIN_PATH || "bob";
 
