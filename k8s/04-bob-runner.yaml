@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: bob-runner
-          image: image-registry.openshift-image-registry.svc:5000/bob-assistant/bob-runner:latest
+          image: image-registry.openshift-image-registry.svc:5000/sre-demo/bob-runner:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081
