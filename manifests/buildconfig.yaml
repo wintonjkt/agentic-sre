@@ -21,8 +21,10 @@ metadata:
     app: sre-bob
 spec:
   source:
-    type: Binary
-    binary: {}
+    type: Git
+    git:
+      uri: https://github.com/wintonjkt/agentic-sre.git
+      ref: main
   strategy:
     type: Docker
     dockerStrategy:
