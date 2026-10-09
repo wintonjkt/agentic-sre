@@ -34,7 +34,6 @@ export function executeBobPrompt(options: BobRunOptions): Promise<BobRunResult> 
       "json",
       "--max-turns",
       "20",
-      ...(apiKey ? ["--auth-method", "api-key"] : []),
     ];
     const gatewayUrl = process.env.BOB_GATEWAY_URL;
     const bobBin = process.env.BOB_BIN_PATH || "bob";
