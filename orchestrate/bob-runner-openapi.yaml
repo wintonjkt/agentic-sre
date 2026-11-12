@@ -1,0 +1,82 @@
+openapi: 3.0.3
+info:
+  title: Bob Shell Runner API
+  version: 1.0.0
+  description: Runs a single IBM Bob Shell prompt headlessly on OpenShift and returns the result synchronously.
+servers:
+  - url: https://bob-runner-api-sre-demo.apps.itz-io8qfw.infra01-lb.lon04.techzone.ibm.com
+paths:
+  /run:
+    post:
+      operationId: run_bob_prompt
+      summary: Run a prompt with Bob Shell
+      description: >-
+        Executes one fully specified prompt with Bob Shell and returns Bob's final answer.
+        Only call this after the prompt has been confirmed by the user. A run can take several
+        seconds to a few minutes. The tool blocks until Bob finishes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  minLength: 1
+                  maxLength: 20000
+                  description: The complete, self-contained instruction for Bob.
+                mode:
+                  type: string
+                  enum: [agent, code, ask, plan, advanced, instana, openshift-sre, infra-sre]
+                  default: agent
+                  description: >-
+                    Bob mode. agent = general (can read/edit files and run commands), ask = answer
+                    questions only, plan = produce a plan only, code = code changes.
+                timeoutSeconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 600
+                  default: 180
+                  description: Maximum run time in seconds.
+      responses:
+        '200':
+          description: Bob finished (check status field).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunResult'
+        '400':
+          description: Invalid request (bad mode, empty prompt, timeout out of range).
+        '401':
+          description: Missing or invalid bearer token.
+        '429':
+          description: Runner is busy (max concurrent runs reached). Retry after the Retry-After header.
+        '504':
+          description: Bob did not finish within timeoutSeconds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunResult'
+      security:
+        - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    RunResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, failed, timeout]
+        result:
+          type: string
+          description: Bob's final answer.
+        exitCode:
+          type: integer
+        durationMs:
+          type: integer

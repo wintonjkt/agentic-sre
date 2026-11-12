@@ -70,7 +70,7 @@ flowchart LR
 
 **Relevant Context:** [`services/bob-runner/src/executor.ts`](services/bob-runner/src/executor.ts), [`container/entrypoint.sh`](container/entrypoint.sh) (the working `bob run` invocation and flags).
 
-**Status:** `[ ] pending`
+**Status:** `[x] done`
 
 ---
 
@@ -95,7 +95,7 @@ flowchart LR
 
 **Relevant Context:** [`services/bob-runner/src/index.ts`](services/bob-runner/src/index.ts), [`services/bob-runner/package.json`](services/bob-runner/package.json) (Fastify 4, `@fastify/cors`), [`services/context-manager/src/index.ts`](services/context-manager/src/index.ts).
 
-**Status:** `[ ] pending`
+**Status:** `[x] done`
 
 ---
 
@@ -117,7 +117,7 @@ flowchart LR
 
 **Relevant Context:** [`services/bob-runner/Dockerfile`](services/bob-runner/Dockerfile), [`manifests/bob-runner-buildconfig.yaml`](manifests/bob-runner-buildconfig.yaml), [`container/Dockerfile`](container/Dockerfile) (reference pattern), [`.gitignore`](.gitignore).
 
-**Status:** `[ ] pending`
+**Status:** `[x] done`
 
 ---
 
@@ -140,7 +140,7 @@ flowchart LR
 
 **Relevant Context:** [`k8s/04-bob-runner.yaml`](k8s/04-bob-runner.yaml), [`k8s/05-context-manager-route.yaml`](k8s/05-context-manager-route.yaml) (Route pattern), [`k8s/02-configmap.yaml`](k8s/02-configmap.yaml), [`k8s/job/02-bob-test-job.yaml`](k8s/job/02-bob-test-job.yaml) (security context pattern).
 
-**Status:** `[ ] pending`
+**Status:** `[x] done`
 
 ---
 
@@ -163,7 +163,7 @@ flowchart LR
 
 **Relevant Context:** [`deploy.sh`](deploy.sh), [`manifests/run-demo.sh`](manifests/run-demo.sh), [`bob-shell-job-plan.md`](bob-shell-job-plan.md) (earlier connectivity validation notes).
 
-**Status:** `[ ] pending`
+**Status:** `[x] done`
 
 ---
 
@@ -174,3 +174,12 @@ flowchart LR
 - **Capacity:** the pod has 2Gi memory. The right `MAX_CONCURRENT_RUNS` should be measured, not guessed (Sub-Task 5).
 - **Long runs through the Route:** the Route timeout annotation and any upstream proxy or client timeouts must all exceed the run timeout. Default is 180s, so keep the cap modest.
 - **`--format json` output shape:** unverified, and Sub-Task 1 depends on it (step 1).
+
+---
+
+## Orchestrate integration (done)
+
+- `orchestrate/bob-runner-openapi.yaml`: OpenAPI tool for `POST /run`, bearer connection `bob_runner_api`.
+- `orchestrate/bob_prompt_agent.yaml`: drafts the Bob prompt, asks clarifying questions, asks for confirmation, then calls the runner.
+- `orchestrate/ibm_docs_rag_agent_v1.yaml`: `bob_prompt_agent` added as a collaborator, so Slack users of `ibm_docs_rag_agent_v1` can use Bob.
+- Import with `orchestrate agents import -f <file>`. Create the connection and set the runner token first (see the Orchestrate CLI docs); never commit the token.
