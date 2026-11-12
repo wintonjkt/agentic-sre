@@ -8,6 +8,11 @@ RUN microdnf install -y tar gzip ca-certificates shadow-utils python3 python3-pi
     microdnf install -y nodejs git && \
     microdnf clean all
 
+# OpenShift CLI so Bob's openshift-sre mode can run oc commands
+RUN curl -fsSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+    | tar -xz -C /usr/local/bin oc kubectl && \
+    chmod +x /usr/local/bin/oc /usr/local/bin/kubectl
+
 # Copy and install bobshell CLI globally (2.0.5 — handles HTTP 400 tool-probe gracefully)
 # Build context must be workspace root: podman build -f services/bob-runner/Dockerfile .
 COPY container/bobshell-2.0.5.tgz /tmp/
