@@ -2,11 +2,13 @@
 # =============================================================================
 # Agentic SRE — Full Deploy Script
 # Target cluster : https://api.itz-nknwzi.infra01-lb.syd05.techzone.ibm.com:6443
-# Bob server     : https://api.bob.ibm-bob.apps.itz-h7532y.infra01-lb.tok04.techzone.ibm.com
+# Bob gateway    : https://api.us-east.bob.ibm.com (Bob SaaS)
 #
 # Usage:
-#   chmod +x deploy.sh
-#   ./deploy.sh
+#   export OCP_TOKEN=sha256~...        # required, never commit it
+#   export OCP_SERVER=https://api...:6443   # optional override
+#   chmod +x deploy.sh && ./deploy.sh
+#   (manifests/secret.yaml is git-ignored; copy manifests/secret.example.yaml)
 #
 # Prerequisites:
 #   - oc CLI installed and on PATH
@@ -15,8 +17,8 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-OCP_SERVER="https://api.itz-nknwzi.infra01-lb.syd05.techzone.ibm.com:6443"
-OCP_TOKEN="REDACTED_OCP_TOKEN"
+OCP_SERVER="${OCP_SERVER:-https://api.itz-nknwzi.infra01-lb.syd05.techzone.ibm.com:6443}"
+: "${OCP_TOKEN:?OCP_TOKEN must be exported (oc login token)}"
 NAMESPACE="sre-demo"
 IMAGE_BASE="image-registry.openshift-image-registry.svc:5000/${NAMESPACE}"
 
@@ -137,6 +139,6 @@ echo ""
 echo " To watch job status after run:"
 echo "   oc get jobs -n ${NAMESPACE} -l app=agentic-sre -w"
 echo ""
-echo " Bob server (on-prem):"
-echo "   https://api.bob.ibm-bob.apps.itz-h7532y.infra01-lb.tok04.techzone.ibm.com"
+echo " Bob gateway (SaaS):"
+echo "   https://api.us-east.bob.ibm.com"
 echo "============================================================"

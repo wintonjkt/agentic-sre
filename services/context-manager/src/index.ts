@@ -90,7 +90,12 @@ async function buildApp() {
           mode,
           approvalMode,
         },
-        { timeout: 180000 }
+        {
+          timeout: 180000,
+          headers: process.env.BOB_RUNNER_TOKEN
+            ? { Authorization: `Bearer ${process.env.BOB_RUNNER_TOKEN}` }
+            : {},
+        }
       );
 
       const assistantContent = response.data.output.trim();

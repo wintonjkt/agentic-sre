@@ -17,15 +17,42 @@ spec:
         app: bob-chat-assistant
         component: bob-runner
     spec:
+      # Longer than MAX_TIMEOUT_SECONDS so in-flight runs can finish on rollout
+      terminationGracePeriodSeconds: 630
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: bob-runner
           image: image-registry.openshift-image-registry.svc:5000/sre-demo/bob-runner:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8081
           envFrom:
             - secretRef:
                 name: bob-credentials
+          env:
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: bob-runner-api
+                  key: API_TOKEN
+            - name: MAX_CONCURRENT_RUNS
+              value: "2"
+            - name: DEFAULT_TIMEOUT_SECONDS
+              value: "180"
+            - name: MAX_TIMEOUT_SECONDS
+              value: "600"
+            - name: BOB_WORKSPACE
+              value: /workspace
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
           resources:
             requests:
               cpu: "200m"
@@ -39,6 +66,15 @@ spec:
               port: 8081
             initialDelaySeconds: 5
             periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: workspace
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -54,3 +90,24 @@ spec:
   ports:
     - port: 8081
       targetPort: 8081
+---
+# External API. Route timeout must exceed MAX_TIMEOUT_SECONDS (default is 30s).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: bob-runner-api
+  labels:
+    app: bob-chat-assistant
+    component: bob-runner
+  annotations:
+    haproxy.router.openshift.io/timeout: 660s
+spec:
+  to:
+    kind: Service
+    name: bob-runner-service
+    weight: 100
+  port:
+    targetPort: 8081
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

@@ -10,6 +10,8 @@ spec:
   lookupPolicy:
     local: true
 ---
+# Binary build: push local source with
+#   oc start-build bob-runner -n sre-demo --from-dir=. --follow
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
@@ -19,17 +21,11 @@ metadata:
     app: bob-chat-assistant
 spec:
   source:
-    type: Git
-    git:
-      uri: https://github.com/wintonjkt/agentic-sre.git
-      ref: main
+    type: Binary
   strategy:
     type: Docker
     dockerStrategy:
       dockerfilePath: services/bob-runner/Dockerfile
-      env:
-        - name: DOCKER_BUILDKIT
-          value: "1"
   output:
     to:
       kind: ImageStreamTag

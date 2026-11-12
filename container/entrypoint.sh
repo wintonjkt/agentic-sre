@@ -12,19 +12,16 @@
 #
 # On-prem routing:
 #   BOB_GATEWAY_URL env var — Bob 2.x routes all traffic through this endpoint.
-#   Set to: https://api.bob.ibm-bob.apps.itz-h7532y.infra01-lb.tok04.techzone.ibm.com
+#   Set to the Bob SaaS gateway: https://api.us-east.bob.ibm.com
 #
-# LiteLLM/Qwen-Coder notes:
-#   - NODE_TLS_REJECT_UNAUTHORIZED=0 is required (on-prem self-signed cert).
-#   - LiteLLM returns HTTP 400 on the first tool-capability probe request.
-#     Bob 2.0.5 treats this as a recoverable error and retries — do not add
-#     --disable-tool-groups workarounds; they are not needed with 2.0.5.
-#   - --max-turns 20 prevents runaway turn loops (Qwen-Coder can loop on
-#     tool calls when it lacks function-calling support).
+# Notes:
+#   - The Bob SaaS gateway has a publicly trusted certificate; TLS verification
+#     stays enabled.
+#   - --max-turns 20 prevents runaway turn loops.
 #
 # Required env vars:
 #   BOBSHELL_API_KEY   - Bob inference API key (from sre-credentials Secret)
-#   BOB_GATEWAY_URL    - On-prem Bob API gateway URL (from sre-credentials Secret)
+#   BOB_GATEWAY_URL    - Bob gateway URL (from sre-credentials Secret)
 #   BOB_PROMPT         - The prompt string to execute
 #   OUTPUT_FILE        - Path to write findings JSON on the shared PVC
 #
@@ -36,10 +33,6 @@
 #   SLACK_WEBHOOK_URL
 
 set -euo pipefail
-
-# On-prem Bob server uses a self-signed cert — disable Node.js TLS verification.
-# Must be exported before the node process starts; setting it after has no effect.
-export NODE_TLS_REJECT_UNAUTHORIZED=0
 
 OUTPUT_FILE="${OUTPUT_FILE:-/workspace/output.json}"
 LOG_FILE="${LOG_FILE:-/workspace/agent.log}"
@@ -60,7 +53,7 @@ mkdir -p "$(dirname "${OUTPUT_FILE}")"
 
 # Log the on-prem gateway being used
 if [ -n "${BOB_GATEWAY_URL:-}" ]; then
-  echo "[entrypoint] On-prem Bob gateway: ${BOB_GATEWAY_URL}"
+  echo "[entrypoint] Bob gateway: ${BOB_GATEWAY_URL}"
 fi
 
 # Run bob run — Bob 2.x headless execution.

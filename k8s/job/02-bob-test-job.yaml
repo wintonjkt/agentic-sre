@@ -38,8 +38,6 @@ spec:
               value: "/workspace/output.json"
             - name: LOG_FILE
               value: "/workspace/agent.log"
-            - name: NODE_TLS_REJECT_UNAUTHORIZED
-              value: "0"
           volumeMounts:
             - name: workspace
               mountPath: /workspace

@@ -18,3 +18,14 @@ build/
 .env
 ~$*
 robot-shop/
+
+# Secrets — keep only *.example.yaml templates in git
+manifests/secret.yaml
+k8s/01-secrets.yaml
+k8s/job/01-secret.yaml
+*apikey*.json
+*-api-key.json
+ocptoken
+github-pat.json
+*.pem
+*.key

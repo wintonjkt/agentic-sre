@@ -5,19 +5,14 @@
 # =============================================================================
 # Auth: BOBSHELL_API_KEY env var (inference API key) — Bob 2.x reads this
 #       automatically via `bob run`; no --auth-method flag needed.
-# Routing: BOB_GATEWAY_URL env var points bob run to the on-prem Bob server.
-#   On-prem URL: https://api.bob.ibm-bob.apps.itz-h7532y.infra01-lb.tok04.techzone.ibm.com
-# TLS: NODE_TLS_REJECT_UNAUTHORIZED=0 is set in entrypoint.sh — the on-prem
-#   server uses a self-signed cert. LiteLLM/Qwen-Coder returns a 400 on the
-#   first tool-capability probe; Bob 2.0.5 handles this as a recoverable error
-#   and retries successfully (fixed in 2.0.5: "Session no longer ends on
-#   recoverable errors").
+# Routing: BOB_GATEWAY_URL env var points bob run to the Bob SaaS gateway
+#   (https://api.us-east.bob.ibm.com).
 # Modes: Bob 2.x uses `execute` group (not 1.x `command`) for shell tool access.
 #   Custom modes are baked into /bob-home/.bob/settings/custom_modes.yaml at build.
 #
 # Required environment variables at runtime:
 #   BOBSHELL_API_KEY    - Bob Shell inference API key for headless auth
-#   BOB_GATEWAY_URL     - On-prem Bob API gateway URL (injected from Secret)
+#   BOB_GATEWAY_URL     - Bob gateway URL (injected from Secret)
 #   CHAT_MODE           - Bob 2.x mode slug (instana / openshift-sre / infra-sre)
 #   BOB_PROMPT          - The prompt string to execute
 #   OUTPUT_FILE         - Path to write findings JSON on the shared PVC
@@ -63,7 +58,7 @@ RUN curl -fsSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/
 #   - `bob run` replaces `bob -p` for headless execution
 #   - `execute` group replaces `command` group in custom modes
 #   - BOBSHELL_API_KEY env var replaces --auth-method api-key flag
-#   - BOB_GATEWAY_URL env var routes to on-prem server (no extra CLI flag)
+#   - BOB_GATEWAY_URL env var routes to the Bob gateway (no extra CLI flag)
 #   - licenseConsent pre-baked in settings.json (no --accept-license needed)
 COPY container/bobshell-2.0.5.tgz /tmp/bobshell.tgz
 RUN npm install --reg=https://registry.npmjs.org/ -g /tmp/bobshell.tgz \
